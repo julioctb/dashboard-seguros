@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seguimiento Bienestar Patrimonial · Paquete 1</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/portal.css">
+<script src="src/data/preload.js"></script>
+
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-badge">BIENESTAR PATRIMONIAL</div>
+      <div class="brand-text">
+        <div class="brand-name">Seguimiento · Paquete 1</div>
+        <div class="brand-sub">Blanca Rosas Facio · Promotoría #2984</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="top-btn ghost" onclick="openPaymentModal()"><span>💰</span> Pagos</button>
+      <button class="top-btn ghost" onclick="exportData()"><span>⬇</span> Respaldar</button>
+      <button class="top-btn ghost" onclick="document.getElementById('importFileInput').click()"><span>⬆</span> Importar</button>
+      <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(event)">
+      <button class="top-btn ghost" onclick="window.print()"><span>🖨</span> PDF</button>
+      <button class="top-btn amber" onclick="openActivityModal()"><span>+</span> Registrar actividad</button>
+    </div>
+  </div>
+</header>
+
+<!-- TABS -->
+<nav class="tabs-bar">
+  <div class="tabs-inner">
+    <button class="tab active" data-view="dashboard"><span>⬢</span> Dashboard</button>
+    <button class="tab" data-view="agents"><span>◉</span> Por agente <span class="tab-pill" id="tabAgentsCount">6</span></button>
+    <button class="tab" data-view="deliverables"><span>▣</span> Entregables <span class="tab-pill" id="tabDelCount">0/21</span></button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dashboard">
+
+    <div class="hero">
+      <div class="hero-top">
+        <div>
+          <div class="hero-title">Programa de Desarrollo Comercial · Fase 1</div>
+          <div class="hero-h1">Arranque y Estabilización</div>
+          <div class="hero-sub">25 mar → 6 may 2026 · 6 semanas · $29,000 MXN</div>
+        </div>
+        <div class="hero-week">
+          <div class="hero-week-num" id="currentWeekNum">3</div>
+          <div class="hero-week-label">Semana actual</div>
+        </div>
+      </div>
+      <div class="hero-progress-wrap">
+        <div class="hero-progress-bar">
+          <div class="hero-progress-fill" id="heroProgressFill" style="width: 0%"></div>
+        </div>
+        <div class="hero-progress-labels">
+          <span>Semana 1 · <strong>25 mar</strong></span>
+          <span id="heroTodayLabel">Hoy</span>
+          <span>Semana 6 · <strong>6 may</strong></span>
+        </div>
+
+        <!-- v5.2 · Desglose del avance real del programa -->
+        <div class="hero-breakdown" id="heroBreakdown">
+          <div class="hero-breakdown-item" title="Materiales / entregables cubiertos">
+            <div class="hero-breakdown-label">Materiales</div>
+            <div class="hero-breakdown-value" id="hbMateriales">0%</div>
+            <div class="hero-breakdown-weight">peso 40%</div>
+          </div>
+          <div class="hero-breakdown-item" title="Citas consumidas sobre 35 contratadas">
+            <div class="hero-breakdown-label">Citas</div>
+            <div class="hero-breakdown-value" id="hbCitas">0%</div>
+            <div class="hero-breakdown-weight">peso 40%</div>
+          </div>
+          <div class="hero-breakdown-item" title="Inducciones de 5 días completadas">
+            <div class="hero-breakdown-label">Inducciones</div>
+            <div class="hero-breakdown-value" id="hbInducciones">0%</div>
+            <div class="hero-breakdown-weight">peso 20%</div>
+            <button class="hero-breakdown-edit" onclick="openInduccionesModal()" title="Editar inducciones">✎</button>
+          </div>
+          <div class="hero-breakdown-item total">
+            <div class="hero-breakdown-label">Avance real</div>
+            <div class="hero-breakdown-value" id="hbTotal">0%</div>
+            <div class="hero-breakdown-weight">ponderado</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Citas consumidas</div>
+        <div class="kpi-value"><span id="kpiCitasDone">0</span><span class="denom">/35</span></div>
+        <div class="kpi-sub" id="kpiCitasPct">0% del contrato</div>
+        <span class="kpi-tag green" id="kpiCitasTag">En ruta</span>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Solicitudes llenadas</div>
+        <div class="kpi-value" id="kpiSolicitud">0</div>
+        <div class="kpi-sub">paso previo a póliza</div>
+        <span class="kpi-tag amber">En proceso</span>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Pólizas emitidas</div>
+        <div class="kpi-value" id="kpiPoliza">0</div>
+        <div class="kpi-sub">ciclo completo 100%</div>
+        <span class="kpi-tag blue">Final</span>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Entregables cubiertos</div>
+        <div class="kpi-value"><span id="kpiDelDone">0</span><span class="denom">/21</span></div>
+        <div class="kpi-sub" id="kpiDelPct">0% avance</div>
+        <span class="kpi-tag blue" id="kpiDelTag">En progreso</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="section-title-badge">01</span>
+          Matriz de actividad por agente
+        </div>
+        <div class="section-meta" id="matrixMeta">6 agentes · Semanas 1-3 ejecutadas</div>
+      </div>
+      <div class="agent-matrix">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Agente</th>
+              <th class="num">Inicial</th>
+              <th class="num">Cierre</th>
+              <th class="num">Solicitud</th>
+              <th class="num">Póliza</th>
+              <th class="num">Reagend.</th>
+              <th class="num">Cancel.</th>
+              <th>Semáforo</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="section-title-badge">02</span>
+          Hallazgos clave · 3 semanas
+        </div>
+      </div>
+      <div class="findings-card">
+        <div class="finding">
+          <div class="finding-icon teal">✓</div>
+          <div class="finding-content">
+            <div class="finding-title">Katia y Ana concentran la actividad útil</div>
+            <div class="finding-text">Son las dos agentes donde el ciclo comercial completa etapas. Recomendamos mantener el enfoque aquí las próximas 3 semanas.</div>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="finding-icon amber">!</div>
+          <div class="finding-content">
+            <div class="finding-title">Liz con ciclo avanzado pero cierres se caen</div>
+            <div class="finding-text">3 citas iniciales efectivas, 3 cierres programados: 2 reagendadas y 1 perdida. Punto a trabajar: calidad de la propuesta previa al cierre.</div>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="finding-icon red">×</div>
+          <div class="finding-content">
+            <div class="finding-title">Jorge: 3 iniciales canceladas al 100%</div>
+            <div class="finding-text">Todas sus citas se empalmaron con las de Katia y Ana. Problema de agenda y compromiso del prospecto, no de proceso.</div>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="finding-icon purple">✎</div>
+          <div class="finding-content">
+            <div class="finding-title">Eva · perfil cliente no calificado</div>
+            <div class="finding-text">Zoom desde Salina Cruz. Los prospectos no muestran interés o ya tienen seguros de vida. Requiere reforzar filtro de prospección.</div>
+          </div>
+        </div>
+        <div class="finding">
+          <div class="finding-icon amber">◐</div>
+          <div class="finding-content">
+            <div class="finding-title">Vicente sin activación</div>
+            <div class="finding-text">No ha respondido a Blanca ni ha agendado. Punto de decisión: definir estatus contractual antes de Semana 4.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="section-title-badge">03</span>
+          Próximos pasos · Semanas 4-6
+        </div>
+        <button class="extras-edit-btn dark" onclick="openNextStepsModal()">✎ Editar lista</button>
+      </div>
+      <div class="findings-card" id="nextStepsList"></div>
+    </div>
+
+    <!-- v5 · Sección "Progreso por prospecto" movida a la vista Por agente (sub-tab bitácora) -->
+
+    <!-- NUEVO v4.1 · CONVERSIONES EXTENDIDAS (aditivo, no toca las del medidor actual) -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="section-title-badge">04</span>
+          Conversiones extendidas · Por etapa
+        </div>
+        <div class="section-meta">Cálculo por prospecto único · Complementa el ciclo</div>
+      </div>
+      <div class="prospect-progress-section">
+        <div id="extConvGrid" class="ext-conv-grid"></div>
+      </div>
+    </div>
+
+    <!-- NUEVO v4.2 · PROGRESO PONDERADO POR AGENTE (aditivo, pesos 30/20/20/30) -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="section-title-badge">05</span>
+          Progreso por agente · Ponderado
+        </div>
+        <div class="section-meta">% promedio del flujo por agente · Pesos Inicial(30) · Cierre(20) · Solicitud(20) · Póliza(30)</div>
+      </div>
+      <div class="prospect-progress-section">
+        <div id="agentProgressTable"></div>
+      </div>
+    </div>
+
+    <!-- NUEVO v5.3 · CIERRES PENDIENTES (backlog de cotizaciones de Ale) -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="section-title-badge">06</span>
+          Cierres pendientes · Backlog de cotizaciones
+        </div>
+        <div class="section-meta">Propuestas que faltan armar o pasar al HTML antes del cierre</div>
+      </div>
+      <div class="cierres-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
+          <span style="font-size:12px; color:var(--text-muted)"><span id="cierresPendienteCount" style="font-weight:700; color:var(--navy)">0</span> pendientes · <span id="cierresListoCount" style="font-weight:700; color:var(--teal)">0</span> listos</span>
+          <button class="cierres-add-btn" onclick="openCierreModal()">+ Agregar cierre pendiente</button>
+        </div>
+        <div id="cierresTableContainer"></div>
+      </div>
+    </div>
+    <!-- FIN NUEVO v4.1 / v4.2 / v5.3 -->
+
+  </section>
+
+  <!-- AGENTS -->
+  <section class="view" id="view-agents">
+    <div class="section-header">
+      <div class="section-title"><span class="section-title-badge">◉</span> Bitácora por agente</div>
+      <div class="section-meta">Registro de citas + ficha de avance</div>
+    </div>
+    <div class="agent-tabs" id="agentTabs"></div>
+    <div id="agentPanels"></div>
+  </section>
+
+  <!-- DELIVERABLES -->
+  <section class="view" id="view-deliverables">
+    <div class="del-summary">
+      <div class="del-sum-main">
+        <div class="del-sum-label">Anexo 1 del contrato · Estado real</div>
+        <div class="del-sum-h">21 entregables contratados</div>
+        <div class="del-sum-bar-wrap">
+          <div class="del-sum-bar-fill" id="delSumBar" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="del-sum-stat"><div class="del-sum-stat-num" id="delStatDone">0</div><div class="del-sum-stat-label">Cubiertos</div></div>
+      <div class="del-sum-stat"><div class="del-sum-stat-num" id="delStatPending">21</div><div class="del-sum-stat-label">Pendientes</div></div>
+      <div class="del-sum-stat"><div class="del-sum-stat-num" id="delStatPct">0%</div><div class="del-sum-stat-label">Avance</div></div>
+    </div>
+
+    <div class="extras-card">
+      <div class="extras-head">
+        <span class="extras-label">+ Valor agregado</span>
+        <div class="extras-h">Extras entregados fuera del contrato</div>
+        <button class="extras-edit-btn" onclick="openExtrasModal()">✎ Editar lista</button>
+      </div>
+      <div class="extras-sub">Entregables adicionales diseñados durante el programa, no contemplados originalmente en el Anexo 1. Sustentan el valor real del acompañamiento.</div>
+      <div class="extras-list" id="extrasList"></div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title"><span class="section-title-badge">01</span> Entregables del contrato</div>
+      <div class="section-meta">Haz clic en el estado para cambiarlo</div>
+    </div>
+    <div class="del-groups" id="delGroups"></div>
+
+    <div class="fase2-card">
+      <div class="fase2-head">
+        <span class="fase2-label">Fase 2 · Siguiente contrato</span>
+        <div class="fase2-h">Reprogramados a la siguiente fase</div>
+      </div>
+      <div class="fase2-sub">Estos entregables fueron ajustados de común acuerdo por prioridades reales surgidas en la ejecución: el equipo requería acompañamiento intensivo en citas, Blanca en recluta activa, y la fase actual del equipo pide consolidar proceso antes de estructurar CRM y protocolos formales. Se reprograman para la Fase 2 del servicio, si Blanca decide continuar.</div>
+      <div class="fase2-list" id="fase2List"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- MODAL EXTRAS -->
+<div class="modal-backdrop" id="extrasModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Editar extras entregados</h2>
+      <button class="modal-close" onclick="closeExtrasModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="list-editor" id="extrasEditor"></div>
+      <button class="list-editor-add" onclick="addExtraItem()">+ Agregar extra</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeExtrasModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveExtras()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NEXT STEPS -->
+<div class="modal-backdrop" id="nextStepsModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Editar próximos pasos</h2>
+      <button class="modal-close" onclick="closeNextStepsModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="list-editor" id="nextStepsEditor"></div>
+      <button class="list-editor-add" onclick="addNextStepItem()">+ Agregar paso</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeNextStepsModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveNextSteps()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     NUEVO v4.1 · MODAL HOOK POST-CIERRE (aditivo)
+     Aparece tras guardar un cierre. Pregunta si se firmó solicitud.
+============================================================ -->
+<div class="modal-backdrop solicitud-hook-modal" id="solicitudHookModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>¿Se firmó solicitud?</h2>
+      <button class="modal-close" onclick="closeSolicitudHook()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:4px">Prospecto: <strong id="solicitudHookProspect" style="color:var(--navy)">—</strong></p>
+      <div class="solicitud-hook-options">
+        <button class="solicitud-hook-opt" onclick="handleSolicitudHookChoice('si')">
+          <strong>Sí · firmó solicitud</strong>
+          <span class="solicitud-hook-opt-sub">Registra automáticamente etapa "Solicitud" con fecha de hoy</span>
+        </button>
+        <button class="solicitud-hook-opt" onclick="handleSolicitudHookChoice('seguimiento')">
+          <strong>Aún no · dejar en seguimiento</strong>
+          <span class="solicitud-hook-opt-sub">Marca fecha de siguiente contacto</span>
+        </button>
+        <button class="solicitud-hook-opt" onclick="handleSolicitudHookChoice('noCerro')">
+          <strong>No cerró</strong>
+          <span class="solicitud-hook-opt-sub">No genera nueva actividad · queda registrado el cierre fallido</span>
+        </button>
+      </div>
+      <div id="solicitudHookFollowup" style="display:none; margin-top:14px">
+        <label style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:var(--text-muted); display:block; margin-bottom:6px">Fecha de siguiente contacto</label>
+        <input type="date" id="solicitudHookNextDate" style="width:100%; padding:10px 12px; border:1px solid var(--gray-300); border-radius:6px">
+        <button class="btn btn-primary" onclick="confirmSolicitudHookFollowup()" style="margin-top:10px; width:100%">Guardar seguimiento</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeSolicitudHook()">Cerrar</button>
+    </div>
+  </div>
+</div>
+<!-- FIN NUEVO v4.1 -->
+
+<!-- ============================================================
+     NUEVO v5 · MODAL UNIFICAR PROSPECTOS DUPLICADOS
+============================================================ -->
+<div class="modal-backdrop" id="dupUnifyModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Unificar nombres de prospectos</h2>
+      <button class="modal-close" onclick="closeDupUnifyModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px">Se detectaron prospectos con nombres parecidos pero escritos de forma distinta. Elige el nombre canónico para cada grupo. Las actividades se agruparán bajo ese nombre.</p>
+      <div id="dupList" class="dup-list"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeDupUnifyModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmUnifyDuplicates()">Unificar todos</button>
+    </div>
+  </div>
+</div>
+<!-- FIN NUEVO v5 -->
+
+<!-- ============================================================
+     NUEVO v5.2 · MODAL INDUCCIONES (2 cohortes de 5 días)
+============================================================ -->
+<div class="modal-backdrop" id="induccionesModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Inducciones · 2 cohortes de 5 días</h2>
+      <button class="modal-close" onclick="closeInduccionesModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px">Cada inducción completada pesa <strong>10% del avance real</strong> del programa (20% combinado). Marca estado, fechas y notas.</p>
+      <div id="induccionesList"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeInduccionesModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveInducciones()">Guardar</button>
+    </div>
+  </div>
+</div>
+<!-- FIN NUEVO v5.2 -->
+
+<!-- ============================================================
+     NUEVO v5.3 · MODAL CIERRE PENDIENTE
+============================================================ -->
+<div class="modal-backdrop" id="cierreModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="cierreModalTitle">Agregar cierre pendiente</h2>
+      <button class="modal-close" onclick="closeCierreModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cierreEditId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Agente</label>
+          <select id="cierreAgente"></select>
+        </div>
+        <div class="form-group">
+          <label>Prospecto</label>
+          <input type="text" id="cierreProspecto" placeholder="Nombre del prospecto">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Producto a cotizar</label>
+          <input type="text" id="cierreProducto" placeholder="Producto SMNYL a cotizar">
+        </div>
+        <div class="form-group">
+          <label>Monto estimado (MXN) <span class="optional">(opcional)</span></label>
+          <input type="text" id="cierreMonto" placeholder="Ej. 15,000">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="cierreEstado">
+            <option value="pendiente">Pendiente · falta armar cotización</option>
+            <option value="en_progreso">En progreso · cotizando</option>
+            <option value="listo">Listo · cotización armada, falta pasar a HTML</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prioridad</label>
+          <select id="cierrePrioridad">
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Fecha límite <span class="optional">(opcional)</span></label>
+        <input type="date" id="cierreFechaLimite">
+      </div>
+      <div class="form-group">
+        <label>Notas</label>
+        <textarea id="cierreNota" placeholder="Detalles, coberturas solicitadas, condiciones especiales..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="cierreDeleteBtn" onclick="deleteCierreFromModal()" style="display:none">Eliminar</button>
+      <button class="btn btn-ghost" onclick="closeCierreModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCierre()">Guardar</button>
+    </div>
+  </div>
+</div>
+<!-- FIN NUEVO v5.3 -->
+
+<!-- STATUS MENU -->
+<div class="status-menu" id="statusMenu">
+  <div class="status-menu-item entregado" data-status="entregado">Entregado</div>
+  <div class="status-menu-item sustituido" data-status="sustituido">Sustituido</div>
+  <div class="status-menu-item progreso" data-status="progreso">En progreso</div>
+  <div class="status-menu-item diferido" data-status="diferido">Diferido</div>
+  <div class="status-menu-item pendiente" data-status="pendiente">Pendiente</div>
+  <div class="status-menu-item fase2" data-status="fase2">Mover a Fase 2</div>
+</div>
+
+<!-- MODAL ACTIVIDAD -->
+<div class="modal-backdrop" id="activityModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Registrar actividad</h2>
+      <button class="modal-close" onclick="closeActivityModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="actEditId">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Agente</label>
+          <select id="actAgent"></select>
+        </div>
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="actDate">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Etapa del ciclo</label>
+          <select id="actType" onchange="onTypeChange()">
+            <option value="inicial">Cita inicial</option>
+            <option value="cierre">Cita de cierre (propuesta)</option>
+            <option value="solicitud">Solicitud llenada</option>
+            <option value="poliza">Póliza emitida</option>
+            <option value="referido">Cita por referido</option>
+            <option value="roleplay">Role-play (cancelación)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Resultado</label>
+          <select id="actResult">
+            <option value="ok">Ejecutada</option>
+            <option value="cerrada">Cerró (venta)</option>
+            <option value="contrapropuesta">Contrapropuesta</option>
+            <option value="noAhora">Por ahora no</option>
+            <option value="reagend">Reagendada</option>
+            <option value="cancel">Cancelada</option>
+            <option value="sustituida">Sustituida con otro prospecto</option>
+            <option value="perdida">Perdida</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Prospecto / Nombre</label>
+        <input type="text" id="actProspect" placeholder="Nombre del prospecto o contexto">
+      </div>
+      <div class="form-group">
+        <label>ANF del prospecto <span class="optional">(opcional)</span></label>
+        <div class="anf-checks" id="anfChecks">
+          <label class="anf-check"><input type="checkbox" value="retiro" onchange="onAnfCheckChange(this)"> Retiro</label>
+          <label class="anf-check"><input type="checkbox" value="ahorro" onchange="onAnfCheckChange(this)"> Ahorro</label>
+          <label class="anf-check"><input type="checkbox" value="educacion" onchange="onAnfCheckChange(this)"> Educación</label>
+          <label class="anf-check"><input type="checkbox" value="proteccion" onchange="onAnfCheckChange(this)"> Protección</label>
+          <label class="anf-check"><input type="checkbox" value="gmm" onchange="onAnfCheckChange(this)"> GMM</label>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:10px">Monto detectado (MXN) <span class="optional">(opcional)</span></label>
+            <input type="text" id="actANFMonto" placeholder="Ej. 15,000">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:10px">Nota adicional <span class="optional">(opcional)</span></label>
+            <input type="text" id="actANFNota" placeholder="Ej. prioridad retiro">
+          </div>
+        </div>
+        <textarea id="actANFSummary" placeholder="Resumen libre del ANF (opcional): meta, capacidad, compromiso..." style="min-height:50px; margin-top:8px"></textarea>
+        <!-- NUEVO v5.3 · Fumador -->
+        <div style="margin-top:10px">
+          <label style="font-size:10px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px">Fumador <span class="optional">(afecta cotización)</span></label>
+          <div class="fumador-toggle" id="fumadorToggle">
+            <button type="button" class="fumador-opt selected" data-val="nd" onclick="setFumador('nd')">No definido</button>
+            <button type="button" class="fumador-opt" data-val="no" onclick="setFumador('no')">🚭 No fuma</button>
+            <button type="button" class="fumador-opt" data-val="si" onclick="setFumador('si')">🚬 Sí fuma</button>
+          </div>
+        </div>
+      </div>
+      <!-- ============================================================
+           NUEVO v4.1 · CAMPOS EXTRA PARA CIERRE/PROPUESTA (aditivo)
+           Solo visible cuando type === 'cierre'. No modifica lógica actual.
+      ============================================================ -->
+      <div class="form-group" id="actCierreFields" style="display:none">
+        <div class="cierre-extra-block">
+          <div class="cierre-extra-block-label">Datos del cierre/propuesta</div>
+          <div class="form-group" style="margin-bottom:10px">
+            <label style="font-size:10px">Producto cotizado <span class="optional">(opcional)</span></label>
+            <input type="text" id="actCierreProducto" placeholder="Nombre del producto cotizado">
+          </div>
+          <p style="font-size:11px; color:var(--text-muted); margin:0">El monto cotizado se reutiliza del campo "Monto detectado" del ANF, arriba.</p>
+        </div>
+      </div>
+      <!-- FIN NUEVO v4.1 -->
+
+      <div class="form-group" id="actPolizaFields" style="display:none">
+        <label>Prima de la póliza emitida (MXN)</label>
+        <input type="text" id="actPrima" placeholder="Ej. 12,000">
+      </div>
+      <div class="form-group">
+        <label>Nota / Retroalimentación</label>
+        <textarea id="actNote" placeholder="Qué pasó, qué trabajar, qué destacar"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="deleteBtn" onclick="deleteActivityFromModal()" style="display:none">Eliminar</button>
+      <button class="btn btn-ghost" onclick="closeActivityModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveActivity()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AGENTE -->
+<div class="modal-backdrop" id="agentModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="agentModalTitle">Agregar nuevo agente</h2>
+      <button class="modal-close" onclick="closeAgentModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="agentEditId">
+      <div class="form-group">
+        <label>Nombre del agente</label>
+        <input type="text" id="newAgentName" placeholder="Ej. María López">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ID único <span class="optional">(auto si vacío)</span></label>
+          <input type="text" id="newAgentId" placeholder="Ej. maria" maxlength="20">
+        </div>
+        <div class="form-group">
+          <label>Iniciales <span class="optional">(1-2 letras)</span></label>
+          <input type="text" id="newAgentInitials" placeholder="M" maxlength="2">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Estado inicial</label>
+        <select id="newAgentStatus">
+          <option value="gray">Sin activación (nuevo)</option>
+          <option value="amber">Seguimiento</option>
+          <option value="green">Foco activo</option>
+          <option value="red">Bajo impacto</option>
+          <option value="blue">Avanzado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nota de contexto</label>
+        <input type="text" id="newAgentTag" placeholder="Ej. Nueva generación · arranca semana 4">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger" id="agentDeleteBtn" onclick="deleteAgent()" style="display:none">Eliminar agente</button>
+      <button class="btn btn-ghost" onclick="closeAgentModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveAgent()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PAGOS -->
+<div class="modal-backdrop" id="paymentModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Esquema de pagos</h2>
+      <button class="modal-close" onclick="closePaymentModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="payment-row">
+        <div class="payment-num paid">1</div>
+        <div class="payment-info">
+          <div class="payment-concept">Anticipo · 30%</div>
+          <div class="payment-date">Al firmar · 24 mar 2026</div>
+        </div>
+        <div class="payment-amount">$8,700</div>
+        <span class="payment-status paid">Pagado</span>
+      </div>
+      <div class="payment-row">
+        <div class="payment-num paid">2</div>
+        <div class="payment-info">
+          <div class="payment-concept">Avance · 35% + adelanto $5,000</div>
+          <div class="payment-date">Inicio Sem 3 · 13 abr 2026</div>
+        </div>
+        <div class="payment-amount">$15,150</div>
+        <span class="payment-status paid">Pagado</span>
+      </div>
+      <div class="payment-row">
+        <div class="payment-num due">3</div>
+        <div class="payment-info">
+          <div class="payment-concept">Cierre · resto tras adelanto</div>
+          <div class="payment-date">Inicio Sem 6 · 4 may 2026</div>
+        </div>
+        <div class="payment-amount">$5,150</div>
+        <span class="payment-status due">Por cobrar</span>
+      </div>
+      <div class="payment-total">
+        <div class="payment-total-label">Total contrato (IVA incl.)</div>
+        <div class="payment-total-value">$29,000</div>
+      </div>
+      <div class="note-inline">
+        <strong>Nota de ajuste:</strong> El 2do pago incluye $5,000 adelantados del pago final a solicitud de la Consultora, ya cubiertos por la Cliente. Saldo del 3er pago queda en $5,150 (IVA incl.).
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="app-footer">Bienestar Patrimonial · Seguimiento Paquete 1 · Alejandra Toledo Consultora · Datos guardados localmente</div>
+<script src="src/store/state.js"></script>
+<script src="src/domain/metrics.js"></script>
+<script src="src/ui/dashboard.js"></script>
+<script src="src/ui/agents.js"></script>
+<script src="src/ui/modals.js"></script>
+<script src="src/extensions/hooks.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
