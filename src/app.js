@@ -23,12 +23,7 @@ function exportData() {
   const data = {
     exportDate: new Date().toISOString(),
     program: PROGRAM,
-    agents: state.agents,
-    activities: state.activities,
-    deliverables: state.deliverables,
-    fichas: state.fichas,
-    extras: state.extras,
-    nextSteps: state.nextSteps,
+    ...createStateSnapshot(),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -74,8 +69,9 @@ function handleImportFile(event) {
 /* ================================================================
    INIT
 ================================================================ */
-function init() {
-  loadState();
+async function init() {
+  await loadState();
+  updateBackendStatusLabel();
 
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => switchView(btn.dataset.view));
@@ -129,7 +125,7 @@ function init() {
 }
 
 
-document.addEventListener('DOMContentLoaded', () => {
-  init();
+document.addEventListener('DOMContentLoaded', async () => {
+  await init();
   runOnReadyTasks();
 });

@@ -248,7 +248,6 @@ function initV41Extensions() {
       if (current.toLowerCase().includes('registrada') || current.toLowerCase().includes('actualizada')) {
         persistFumadorFromSnapshot();
         maybeTriggerSolicitudHook();
-        renderProspectProgress();
         renderExtConversions();
         renderAgentProgressTable();
       }
@@ -268,7 +267,6 @@ function initV41Extensions() {
   });
 
   /* 6. Primer render de los bloques nuevos */
-  renderProspectProgress();
   renderExtConversions();
   renderAgentProgressTable();
 
@@ -276,7 +274,6 @@ function initV41Extensions() {
   const dashboardObserver = new MutationObserver(() => {
     const view = document.getElementById('view-dashboard');
     if (view && view.classList.contains('active')) {
-      renderProspectProgress();
       renderExtConversions();
       renderAgentProgressTable();
     }
@@ -315,11 +312,6 @@ function loadFumadorFromActivity(act) {
   setFumador(act && act.fumador ? act.fumador : 'nd');
 }
 
-function fumadorPill(val) {
-  if (val === 'no') return '<span class="fumador-pill no">🚭 No fuma</span>';
-  if (val === 'si') return '<span class="fumador-pill si">🚬 Fuma</span>';
-  return '';
-}
 
 function findActivityFromLastSavedSnapshot() {
   const snap = lastSavedSnapshot_v41;
@@ -366,8 +358,6 @@ registerOnReady(() => {
 /* state.cierres: array de { id, agente, prospecto, producto, monto, estado, prioridad, fechaLimite, nota } */
 /* saveState ya incluye cierres en la función unificada del bloque STATE */
 
-/* getCierres: helper seguro */
-function getCierres() { return state.cierres || []; }
 
 /* Cableado init v5.3 */
 registerOnReady(() => {
