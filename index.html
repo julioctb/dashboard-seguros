@@ -6,6 +6,7 @@
 <title>Seguimiento Bienestar Patrimonial · Paquete 1</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/portal.css">
+<script src="src/config/backend.js"></script>
 <script src="src/data/preload.js"></script>
 
 </head>
@@ -709,11 +710,13 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="app-footer">Bienestar Patrimonial · Seguimiento Paquete 1 · Alejandra Toledo Consultora · Datos guardados localmente</div>
+<div class="app-footer">Bienestar Patrimonial · Seguimiento Paquete 1 · Alejandra Toledo Consultora · Datos guardados en <span id="backendStatusLabel">localStorage</span></div>
+<script src="src/store/backend.js"></script>
 <script src="src/store/state.js"></script>
 <script src="src/domain/metrics.js"></script>
 <script src="src/ui/dashboard.js"></script>
 <script src="src/ui/agents.js"></script>
+<script src="src/ui/cierres.js"></script>
 <script src="src/ui/modals.js"></script>
 <script src="src/extensions/hooks.js"></script>
 <script src="src/app.js"></script>

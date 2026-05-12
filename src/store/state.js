@@ -316,11 +316,69 @@ function applyStateSnapshot(snapshot) {
   }
 }
 
-function loadState() {
+function createStateSnapshot() {
+  return {
+    agents: state.agents,
+    activities: state.activities,
+    deliverables: state.deliverables,
+    fichas: state.fichas,
+    extras: state.extras,
+    nextSteps: state.nextSteps,
+    inducciones: state.inducciones,
+    cierres: state.cierres || [],
+    currentAgent: state.currentAgent,
+    currentSubtab: state.currentSubtab,
+  };
+}
+
+function loadLocalStateSnapshot() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+function saveLocalStateSnapshot(snapshot) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+}
+
+async function loadState() {
+  const backendConfig = getBackendConfig();
+  const localSnapshot = (() => {
+    try { return loadLocalStateSnapshot(); }
+    catch (e) { console.error('Local load error', e); return null; }
+  })();
+
+  if (isSupabaseBackendEnabled()) {
+    try {
+      const remoteSnapshot = await loadSupabaseSnapshot();
+      if (remoteSnapshot) {
+        applyStateSnapshot(remoteSnapshot);
+        saveLocalStateSnapshot(createStateSnapshot());
+        setBackendStatus({ type: 'supabase', connected: true, lastError: null, lastSyncAt: new Date().toISOString() });
+        return;
+      }
+      if (localSnapshot) {
+        applyStateSnapshot(localSnapshot);
+      } else {
+        applyStateSnapshot(buildDefaultState());
+      }
+      saveState();
+      setBackendStatus({ type: 'supabase', connected: true, lastError: null });
+      return;
+    } catch (e) {
+      console.error('Supabase load error', e);
+      setBackendStatus({ type: 'supabase', connected: false, lastError: e.message });
+      if (!backendConfig.supabase.fallbackToLocalStorage) {
+        applyStateSnapshot(buildDefaultState());
+        showToast('No se pudo cargar Supabase', 'error');
+        return;
+      }
+      showToast('Supabase no disponible · usando copia local', 'error');
+    }
+  }
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      applyStateSnapshot(JSON.parse(raw));
+    if (localSnapshot) {
+      applyStateSnapshot(localSnapshot);
     } else {
       applyStateSnapshot(buildDefaultState());
       saveState();
@@ -332,22 +390,24 @@ function loadState() {
 }
 
 function saveState() {
+  const snapshot = createStateSnapshot();
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      agents: state.agents,
-      activities: state.activities,
-      deliverables: state.deliverables,
-      fichas: state.fichas,
-      extras: state.extras,
-      nextSteps: state.nextSteps,
-      inducciones: state.inducciones,
-      cierres: state.cierres || [],
-      currentAgent: state.currentAgent,
-      currentSubtab: state.currentSubtab,
-    }));
+    saveLocalStateSnapshot(snapshot);
   } catch(e) {
     console.error('Save error', e);
     showToast('Error al guardar (límite de almacenamiento)', 'error');
+  }
+
+  if (isSupabaseBackendEnabled()) {
+    saveSupabaseSnapshot(snapshot)
+      .then(() => setBackendStatus({ type: 'supabase', connected: true, lastError: null, lastSyncAt: new Date().toISOString() }))
+      .catch(e => {
+        console.error('Supabase save error', e);
+        setBackendStatus({ type: 'supabase', connected: false, lastError: e.message });
+        if (!getBackendConfig().supabase.fallbackToLocalStorage) {
+          showToast('No se pudo guardar en Supabase', 'error');
+        }
+      });
   }
 }
 
@@ -410,3 +470,5 @@ function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function escapeAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, "&quot;"); }
+
+function getCierres() { return state.cierres || []; }

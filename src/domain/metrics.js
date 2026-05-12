@@ -53,7 +53,6 @@ function totalsGlobal() {
    ================================================================
    Este bloque agrega:
    - calculateProcessProgress(prospectName, agentId)
-   - renderProspectProgress()  → tabla de prospectos con barras
    - calculateNewConversions() → bloque de conversiones extendidas
    - Hook post-guardado (observa mutaciones al toast sin tocar saveActivity)
    - Campos extra para cierre (producto cotizado)
