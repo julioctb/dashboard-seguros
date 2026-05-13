@@ -7,6 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/portal.css">
 <script src="src/config/backend.js"></script>
+<script src="src/data/default-state.js"></script>
+<script src="src/data/preload-state.js"></script>
 <script src="src/data/preload.js"></script>
 
 </head>
@@ -16,10 +18,10 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <div class="brand-badge">BIENESTAR PATRIMONIAL</div>
+      <div class="brand-badge" id="brandBadgeText">BIENESTAR PATRIMONIAL</div>
       <div class="brand-text">
-        <div class="brand-name">Seguimiento · Paquete 1</div>
-        <div class="brand-sub">Blanca Rosas Facio · Promotoría #2984</div>
+        <div class="brand-name" id="brandNameText">Seguimiento · Paquete 1</div>
+        <div class="brand-sub" id="brandSubText">Blanca Rosas Facio · Promotoría #2984</div>
       </div>
     </div>
     <div class="top-actions">
@@ -39,6 +41,7 @@
     <button class="tab active" data-view="dashboard"><span>⬢</span> Dashboard</button>
     <button class="tab" data-view="agents"><span>◉</span> Por agente <span class="tab-pill" id="tabAgentsCount">6</span></button>
     <button class="tab" data-view="deliverables"><span>▣</span> Entregables <span class="tab-pill" id="tabDelCount">0/21</span></button>
+    <button class="tab" data-view="admin"><span>⚙</span> Administrador</button>
   </div>
 </nav>
 
@@ -50,9 +53,9 @@
     <div class="hero">
       <div class="hero-top">
         <div>
-          <div class="hero-title">Programa de Desarrollo Comercial · Fase 1</div>
-          <div class="hero-h1">Arranque y Estabilización</div>
-          <div class="hero-sub">25 mar → 6 may 2026 · 6 semanas · $29,000 MXN</div>
+          <div class="hero-title" id="heroTitleText">Programa de Desarrollo Comercial · Fase 1</div>
+          <div class="hero-h1" id="heroH1Text">Arranque y Estabilización</div>
+          <div class="hero-sub" id="heroSubText">25 mar → 6 may 2026 · 6 semanas · $29,000 MXN</div>
         </div>
         <div class="hero-week">
           <div class="hero-week-num" id="currentWeekNum">3</div>
@@ -273,7 +276,7 @@
     <div class="del-summary">
       <div class="del-sum-main">
         <div class="del-sum-label">Anexo 1 del contrato · Estado real</div>
-        <div class="del-sum-h">21 entregables contratados</div>
+        <div class="del-sum-h" id="deliverablesContractTotalText">21 entregables contratados</div>
         <div class="del-sum-bar-wrap">
           <div class="del-sum-bar-fill" id="delSumBar" style="width: 0%"></div>
         </div>
@@ -307,6 +310,15 @@
       <div class="fase2-sub">Estos entregables fueron ajustados de común acuerdo por prioridades reales surgidas en la ejecución: el equipo requería acompañamiento intensivo en citas, Blanca en recluta activa, y la fase actual del equipo pide consolidar proceso antes de estructurar CRM y protocolos formales. Se reprograman para la Fase 2 del servicio, si Blanca decide continuar.</div>
       <div class="fase2-list" id="fase2List"></div>
     </div>
+  </section>
+
+  <!-- ADMIN -->
+  <section class="view" id="view-admin">
+    <div class="section-header">
+      <div class="section-title"><span class="section-title-badge">⚙</span> Portal administrador</div>
+      <div class="section-meta">Configuración interna del portal, catálogos y backend</div>
+    </div>
+    <div id="adminContent"></div>
   </section>
 
 </main>
@@ -656,7 +668,7 @@
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-danger" id="agentDeleteBtn" onclick="deleteAgent()" style="display:none">Eliminar agente</button>
+      <button class="btn btn-danger" id="agentDeleteBtn" onclick="deleteAgentFromModal()" style="display:none">Eliminar agente</button>
       <button class="btn btn-ghost" onclick="closeAgentModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="saveAgent()">Guardar</button>
     </div>
@@ -700,7 +712,7 @@
       </div>
       <div class="payment-total">
         <div class="payment-total-label">Total contrato (IVA incl.)</div>
-        <div class="payment-total-value">$29,000</div>
+        <div class="payment-total-value" id="paymentTotalValue">$29,000</div>
       </div>
       <div class="note-inline">
         <strong>Nota de ajuste:</strong> El 2do pago incluye $5,000 adelantados del pago final a solicitud de la Consultora, ya cubiertos por la Cliente. Saldo del 3er pago queda en $5,150 (IVA incl.).
@@ -710,15 +722,28 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="app-footer">Bienestar Patrimonial · Seguimiento Paquete 1 · Alejandra Toledo Consultora · Datos guardados en <span id="backendStatusLabel">localStorage</span></div>
+<div class="app-footer"><span id="appFooterBrandText">Bienestar Patrimonial</span> · <span id="appFooterProgramText">Seguimiento Paquete 1</span> · Alejandra Toledo Consultora · Datos guardados en <span id="backendStatusLabel">localStorage</span></div>
 <script src="src/store/backend.js"></script>
+<script src="src/ui/helpers.js"></script>
 <script src="src/store/state.js"></script>
+<script src="src/store/actions.js"></script>
+<script src="src/store/actions.activities.js"></script>
+<script src="src/store/actions.agents.js"></script>
+<script src="src/store/actions.ficha.js"></script>
+<script src="src/store/actions.deliverables.js"></script>
 <script src="src/domain/metrics.js"></script>
 <script src="src/ui/dashboard.js"></script>
+<script src="src/ui/deliverables.js"></script>
+<script src="src/ui/agents.ficha.js"></script>
+<script src="src/ui/agents.bitacora.js"></script>
 <script src="src/ui/agents.js"></script>
 <script src="src/ui/cierres.js"></script>
+<script src="src/ui/modals.lists.js"></script>
+<script src="src/ui/modals.workflow.js"></script>
+<script src="src/ui/modals.cierres.js"></script>
 <script src="src/ui/modals.js"></script>
-<script src="src/extensions/hooks.js"></script>
+<script src="src/ui/admin.js"></script>
 <script src="src/app.js"></script>
+<script src="src/extensions/hooks.js"></script>
 </body>
 </html>

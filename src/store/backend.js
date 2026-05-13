@@ -1,16 +1,7 @@
 /* ================================================================
    BACKEND ADAPTERS · localStorage / Supabase REST
 ================================================================ */
-const BACKEND_DEFAULT_CONFIG = {
-  type: 'localStorage',
-  supabase: {
-    url: '',
-    anonKey: '',
-    table: 'portal_snapshots',
-    snapshotId: 'bienestar-patrimonial-paquete-1',
-    fallbackToLocalStorage: true,
-  },
-};
+const BACKEND_DEFAULT_CONFIG = buildDefaultBackendEditableConfig();
 
 let backendStatus = {
   type: 'localStorage',
@@ -19,22 +10,27 @@ let backendStatus = {
   lastSyncAt: null,
 };
 
+let supabaseSaveQueue = Promise.resolve();
+
 function getBackendConfig() {
-  const custom = (typeof window !== 'undefined' && window.PORTAL_BACKEND_CONFIG) || {};
-  const supabase = {
-    ...BACKEND_DEFAULT_CONFIG.supabase,
-    ...(custom.supabase || {}),
-  };
-  return {
-    ...BACKEND_DEFAULT_CONFIG,
-    ...custom,
-    supabase,
-  };
+  const custom = (typeof window !== 'undefined' && window.PORTAL_BACKEND_CONFIG) || BACKEND_DEFAULT_CONFIG;
+  return normalizeBackendEditableConfig(custom);
 }
 
 function isSupabaseBackendEnabled() {
   const config = getBackendConfig();
   return config.type === 'supabase' && Boolean(config.supabase.url && config.supabase.anonKey);
+}
+
+function shouldUseLocalSnapshotCache() {
+  const config = getBackendConfig();
+  if (config.type !== 'supabase') return true;
+  return config.cacheLocalSnapshot !== false;
+}
+
+function shouldSeedFromPreload() {
+  const config = getBackendConfig();
+  return config.seedFromPreload !== false;
 }
 
 function getSupabaseRestBaseUrl(config) {
@@ -83,6 +79,19 @@ async function saveSupabaseSnapshot(snapshot) {
     payload: snapshot,
     updated_at: new Date().toISOString(),
   });
+}
+
+function cloneSnapshotForTransport(snapshot) {
+  if (typeof structuredClone === 'function') return structuredClone(snapshot);
+  return JSON.parse(JSON.stringify(snapshot));
+}
+
+function queueSupabaseSnapshotSave(snapshot) {
+  const queuedSnapshot = cloneSnapshotForTransport(snapshot);
+  supabaseSaveQueue = supabaseSaveQueue
+    .catch(() => null)
+    .then(() => saveSupabaseSnapshot(queuedSnapshot));
+  return supabaseSaveQueue;
 }
 
 function updateBackendStatusLabel() {

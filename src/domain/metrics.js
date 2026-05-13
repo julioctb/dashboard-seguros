@@ -1,19 +1,36 @@
 /* ================================================================
    STATS + SEMÁFORO
 ================================================================ */
-function agentStats(agentId) {
-  const acts = state.activities.filter(a => a.agent === agentId);
+function getActivitiesForAgent(agentId, activities) {
+  return (activities || []).filter(activity => activity.agent === agentId);
+}
+
+function getActivitySuccessResultValues() {
+  return ['ok', 'cerrada'].map(key => getCatalogSemanticValue('activityResults', key));
+}
+
+function agentStats(agentId, activities) {
+  const acts = getActivitiesForAgent(agentId, activities || state.activities);
+  const usefulResults = getActivityUsefulResultValues();
+  const successResults = getActivitySuccessResultValues();
+  const typeInicial = getCatalogSemanticValue('activityTypes', 'inicial');
+  const typeCierre = getCatalogSemanticValue('activityTypes', 'cierre');
+  const typeSolicitud = getCatalogSemanticValue('activityTypes', 'solicitud');
+  const typePoliza = getCatalogSemanticValue('activityTypes', 'poliza');
+  const typeReferido = getCatalogSemanticValue('activityTypes', 'referido');
+  const resultReagend = getCatalogSemanticValue('activityResults', 'reagend');
+  const resultCancel = getCatalogSemanticValue('activityResults', 'cancel');
   // Iniciales: contamos las ejecutadas (ok, cerrada, contrapropuesta, noAhora)
-  const iniciales = acts.filter(a => a.type === 'inicial' && ['ok','cerrada','contrapropuesta','noAhora'].includes(a.result)).length;
-  const cierres = acts.filter(a => a.type === 'cierre' && ['ok','cerrada','contrapropuesta','noAhora'].includes(a.result)).length;
-  const solicitudes = acts.filter(a => a.type === 'solicitud' && ['ok','cerrada'].includes(a.result)).length;
-  const polizas = acts.filter(a => a.type === 'poliza' && ['ok','cerrada'].includes(a.result)).length;
-  const referidos = acts.filter(a => a.type === 'referido' && ['ok','cerrada'].includes(a.result)).length;
-  const reagend = acts.filter(a => a.result === 'reagend').length;
-  const cancel = acts.filter(a => a.result === 'cancel').length;
+  const iniciales = acts.filter(a => a.type === typeInicial && usefulResults.includes(a.result)).length;
+  const cierres = acts.filter(a => a.type === typeCierre && usefulResults.includes(a.result)).length;
+  const solicitudes = acts.filter(a => a.type === typeSolicitud && successResults.includes(a.result)).length;
+  const polizas = acts.filter(a => a.type === typePoliza && successResults.includes(a.result)).length;
+  const referidos = acts.filter(a => a.type === typeReferido && successResults.includes(a.result)).length;
+  const reagend = acts.filter(a => a.result === resultReagend).length;
+  const cancel = acts.filter(a => a.result === resultCancel).length;
   // v5.1 · Criterio cita consumida (interpretación B): solo citas de tipo inicial
   // cuentan para el contrato, ya sean ejecutadas o reagendadas.
-  const inicialesReagendadas = acts.filter(a => a.type === 'inicial' && a.result === 'reagend').length;
+  const inicialesReagendadas = acts.filter(a => a.type === typeInicial && a.result === resultReagend).length;
   const citasConsumidas = iniciales + inicialesReagendadas;
   return {
     iniciales, cierres, solicitudes, polizas, referidos,
@@ -33,20 +50,22 @@ function agentSemaforo(s) {
   return { level: 'atencion', text: 'Atención' };
 }
 
-function totalsGlobal() {
+function totalsGlobal(agents, activities) {
+  const allAgents = agents || state.agents;
+  const allActivities = activities || state.activities;
+  const resultReagend = getCatalogSemanticValue('activityResults', 'reagend');
+  const resultCancel = getCatalogSemanticValue('activityResults', 'cancel');
   let consumidas = 0, polizas = 0, solicitudes = 0;
-  state.agents.forEach(a => {
-    const s = agentStats(a.id);
+  allAgents.forEach(agent => {
+    const s = agentStats(agent.id, allActivities);
     consumidas += s.citasConsumidas;
     polizas += s.polizas;
     solicitudes += s.solicitudes;
   });
-  const reagend = state.activities.filter(a => a.result === 'reagend').length;
-  const cancel = state.activities.filter(a => a.result === 'cancel').length;
+  const reagend = allActivities.filter(activity => activity.result === resultReagend).length;
+  const cancel = allActivities.filter(activity => activity.result === resultCancel).length;
   return { consumidas, reagend, cancel, polizas, solicitudes };
 }
-
-/* ================================================================
 
 /* ================================================================
    NUEVO v4.1 · EXTENSIÓN FLUJO PROSPECTOS (aditivo, no modifica nada)
@@ -70,21 +89,25 @@ const STAGE_WEIGHTS_V41 = {
 /* Calcula progreso acumulado para un prospecto específico.
    Agrupa por prospect+agent (mismo prospecto puede tener varias actividades).
    Solo cuenta actividades con resultado "útil" (ok, cerrada, contrapropuesta, noAhora). */
-function calculateProcessProgress(prospectName, agentId) {
+function calculateProcessProgress(prospectName, agentId, activities) {
   if (!prospectName) return { pct: 0, stages: {}, lastDate: '', lastType: '' };
-  const acts = state.activities.filter(a =>
+  const typeInicial = getCatalogSemanticValue('activityTypes', 'inicial');
+  const typeCierre = getCatalogSemanticValue('activityTypes', 'cierre');
+  const typeSolicitud = getCatalogSemanticValue('activityTypes', 'solicitud');
+  const typePoliza = getCatalogSemanticValue('activityTypes', 'poliza');
+  const acts = (activities || state.activities).filter(a =>
     a.prospect && a.agent === agentId &&
     a.prospect.trim().toLowerCase() === prospectName.trim().toLowerCase()
   );
-  const validResults = ['ok', 'cerrada', 'contrapropuesta', 'noAhora'];
+  const validResults = getActivityUsefulResultValues();
   const stages = { inicial: false, cierre: false, solicitud: false, poliza: false };
   let lastDate = '', lastType = '';
   acts.forEach(a => {
     if (validResults.includes(a.result)) {
-      if (a.type === 'inicial') stages.inicial = true;
-      if (a.type === 'cierre') stages.cierre = true;
-      if (a.type === 'solicitud') stages.solicitud = true;
-      if (a.type === 'poliza') stages.poliza = true;
+      if (a.type === typeInicial) stages.inicial = true;
+      if (a.type === typeCierre) stages.cierre = true;
+      if (a.type === typeSolicitud) stages.solicitud = true;
+      if (a.type === typePoliza) stages.poliza = true;
     }
     if (!lastDate || (a.date && a.date > lastDate)) { lastDate = a.date; lastType = a.type; }
   });
@@ -97,9 +120,9 @@ function calculateProcessProgress(prospectName, agentId) {
 }
 
 /* Agrupa todas las actividades por par prospecto+agente para listar prospectos únicos */
-function getUniqueProspects() {
+function getUniqueProspects(activities) {
   const map = new Map();
-  state.activities.forEach(a => {
+  (activities || state.activities).forEach(a => {
     if (!a.prospect || !a.prospect.trim()) return;
     const key = a.agent + '::' + a.prospect.trim().toLowerCase();
     if (!map.has(key)) {
@@ -114,11 +137,12 @@ function getUniqueProspects() {
 
 
 /* Conversiones extendidas · sobre prospectos únicos (no actividades) */
-function calculateNewConversions() {
-  const prospects = getUniqueProspects();
+function calculateNewConversions(activities) {
+  const allActivities = activities || state.activities;
+  const prospects = getUniqueProspects(allActivities);
   let withInicial = 0, withCierre = 0, withSolicitud = 0, withPoliza = 0;
   prospects.forEach(p => {
-    const st = calculateProcessProgress(p.prospect, p.agent).stages;
+    const st = calculateProcessProgress(p.prospect, p.agent, allActivities).stages;
     if (st.inicial) withInicial++;
     if (st.cierre) withCierre++;
     if (st.solicitud) withSolicitud++;
@@ -143,15 +167,16 @@ function calculateNewConversions() {
    Calcula % promedio del flujo de cada agente usando los pesos 30/20/20/30
    sobre los prospectos únicos atendidos por ese agente.
 ============================================================ */
-function calculateAgentWeightedProgress(agentId) {
-  const prospects = getUniqueProspects().filter(p => p.agent === agentId);
+function calculateAgentWeightedProgress(agentId, activities) {
+  const allActivities = activities || state.activities;
+  const prospects = getUniqueProspects(allActivities).filter(p => p.agent === agentId);
   if (prospects.length === 0) {
     return { avgPct: 0, totalProspects: 0, stageCount: { inicial: 0, cierre: 0, solicitud: 0, poliza: 0 } };
   }
   let sumPct = 0;
   const stageCount = { inicial: 0, cierre: 0, solicitud: 0, poliza: 0 };
   prospects.forEach(p => {
-    const prog = calculateProcessProgress(p.prospect, agentId);
+    const prog = calculateProcessProgress(p.prospect, agentId, allActivities);
     sumPct += prog.pct;
     if (prog.stages.inicial) stageCount.inicial++;
     if (prog.stages.cierre) stageCount.cierre++;
@@ -178,8 +203,9 @@ function normalizeProspectKey_v5(name) {
 
 /* Agrupa actividades del agente por prospecto normalizado.
    Retorna { withProspect: [{key, displayName, activities[], variants[]}], withoutProspect: [] } */
-function groupActivitiesByProspect_v5(agentId) {
-  const acts = state.activities.filter(a => a.agent === agentId);
+function groupActivitiesByProspect_v5(agentId, activities) {
+  const acts = getActivitiesForAgent(agentId, activities || state.activities);
+  const typeCierre = getCatalogSemanticValue('activityTypes', 'cierre');
   const groups = new Map(); /* key normalizada -> { displayName, activities[], variants Set } */
   const orphans = [];
 
@@ -214,12 +240,12 @@ function groupActivitiesByProspect_v5(agentId) {
 
   /* Enriquecer grupos con progreso y ordenar por % desc */
   const withProspect = Array.from(groups.values()).map(g => {
-    const progress = calculateProcessProgress(g.displayName, agentId);
+    const progress = calculateProcessProgress(g.displayName, agentId, acts);
     /* Extraer producto cotizado y monto de actividades de cierre */
     let productoCotizado = '';
     let montoCotizado = '';
     g.activities.forEach(a => {
-      if (a.type === 'cierre' && a.productoCotizado && !productoCotizado) productoCotizado = a.productoCotizado;
+      if (a.type === typeCierre && a.productoCotizado && !productoCotizado) productoCotizado = a.productoCotizado;
       if (a.anfMonto && !montoCotizado) montoCotizado = a.anfMonto;
     });
     return { ...g, progress, productoCotizado, montoCotizado };
@@ -229,7 +255,7 @@ function groupActivitiesByProspect_v5(agentId) {
 }
 
 /* Detecta duplicados: variantes distintas que normalizan igual */
-function detectProspectDuplicates_v5(agentId) {
-  const { withProspect } = groupActivitiesByProspect_v5(agentId);
+function detectProspectDuplicates_v5(agentId, activities) {
+  const { withProspect } = groupActivitiesByProspect_v5(agentId, activities || state.activities);
   return withProspect.filter(g => g.variants.length > 1);
 }

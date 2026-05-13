@@ -1,49 +1,85 @@
 /* ================================================================
    DASHBOARD RENDER
 ================================================================ */
+function computeCurrentWeek() {
+  const program = getProgramSettings();
+  const start = new Date(program.startDate + 'T00:00:00');
+  const today = new Date();
+  const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+  const week = Math.floor(diffDays / 7) + 1;
+  return Math.max(1, Math.min(week, program.totalWeeks));
+}
+
 function renderDashboard() {
+  const program = getProgramSettings();
   const week = computeCurrentWeek();
-  document.getElementById('currentWeekNum').textContent = week;
+  const weekEl = document.getElementById('currentWeekNum');
+  if (weekEl) weekEl.textContent = week;
 
-  const t = totalsGlobal();
-  document.getElementById('kpiCitasDone').textContent = t.consumidas;
-  const citasPct = Math.min(100, Math.round((t.consumidas / PROGRAM.citasContratadas) * 100));
-  document.getElementById('kpiCitasPct').textContent = citasPct + '% del contrato';
-  const citasTag = document.getElementById('kpiCitasTag');
-  const expectedPct = (week / PROGRAM.totalWeeks) * 100;
-  if (citasPct >= expectedPct - 10) { citasTag.className = 'kpi-tag green'; citasTag.textContent = 'En ruta'; }
-  else if (citasPct >= expectedPct - 25) { citasTag.className = 'kpi-tag amber'; citasTag.textContent = 'Atención'; }
-  else { citasTag.className = 'kpi-tag red'; citasTag.textContent = 'Atraso'; }
-
-  document.getElementById('kpiSolicitud').textContent = t.solicitudes;
-  document.getElementById('kpiPoliza').textContent = t.polizas;
-
-  const cov = countDeliverablesCovered();
-  document.getElementById('kpiDelDone').textContent = cov;
-  const delPct = Math.min(100, Math.round((cov / PROGRAM.totalEntregables) * 100));
-  document.getElementById('kpiDelPct').textContent = delPct + '% avance';
-
-  /* v5.2 · Avance real ponderado del programa */
-  const induccionesDone = (state.inducciones || []).filter(i => i.status === 'done').length;
-  const induccionesPct = Math.round((induccionesDone / 2) * 100);
+  const totals = totalsGlobal();
+  const citasMeta = Math.max(1, Number(program.citasContratadas) || 0);
+  const deliverablesMeta = Math.max(1, Number(program.totalEntregables) || 0);
+  const citasPct = Math.min(100, Math.round((totals.consumidas / citasMeta) * 100));
+  const coveredDeliverables = countDeliverablesCovered();
+  const delPct = Math.min(100, Math.round((coveredDeliverables / deliverablesMeta) * 100));
+  const induccionesDone = (state.inducciones || []).filter(induccion => induccion.status === 'done').length;
+  const induccionesTotal = Math.max(1, (state.inducciones || []).length || 0);
+  const induccionesPct = Math.round((induccionesDone / induccionesTotal) * 100);
   const avanceReal = Math.round((delPct * 0.4) + (citasPct * 0.4) + (induccionesPct * 0.2));
+  const expectedPct = (week / Math.max(1, Number(program.totalWeeks) || 1)) * 100;
 
-  /* Hero: barra refleja avance real, no tiempo transcurrido */
-  document.getElementById('heroProgressFill').style.width = avanceReal + '%';
-  document.getElementById('heroTodayLabel').innerHTML = 'Hoy · <strong>Sem ' + week + '</strong> · avance real <strong>' + avanceReal + '%</strong>';
+  const citasDoneEl = document.getElementById('kpiCitasDone');
+  const citasPctEl = document.getElementById('kpiCitasPct');
+  const citasTagEl = document.getElementById('kpiCitasTag');
+  const solicitudEl = document.getElementById('kpiSolicitud');
+  const polizaEl = document.getElementById('kpiPoliza');
+  const delDoneEl = document.getElementById('kpiDelDone');
+  const delPctEl = document.getElementById('kpiDelPct');
+  const heroFillEl = document.getElementById('heroProgressFill');
+  const heroTodayEl = document.getElementById('heroTodayLabel');
+  const matrixMetaEl = document.getElementById('matrixMeta');
+  const tabAgentsCountEl = document.getElementById('tabAgentsCount');
+  const tabDelCountEl = document.getElementById('tabDelCount');
 
-  /* Desglose visible */
-  const hbMat = document.getElementById('hbMateriales'); if (hbMat) hbMat.textContent = delPct + '%';
-  const hbCit = document.getElementById('hbCitas'); if (hbCit) hbCit.textContent = citasPct + '%';
-  const hbInd = document.getElementById('hbInducciones'); if (hbInd) hbInd.textContent = induccionesPct + '%';
-  const hbTot = document.getElementById('hbTotal'); if (hbTot) hbTot.textContent = avanceReal + '%';
+  if (citasDoneEl) citasDoneEl.textContent = totals.consumidas;
+  if (citasPctEl) citasPctEl.textContent = citasPct + '% del contrato';
+  if (citasTagEl) {
+    if (citasPct >= expectedPct - 10) {
+      citasTagEl.className = 'kpi-tag green';
+      citasTagEl.textContent = 'En ruta';
+    } else if (citasPct >= expectedPct - 25) {
+      citasTagEl.className = 'kpi-tag amber';
+      citasTagEl.textContent = 'Atención';
+    } else {
+      citasTagEl.className = 'kpi-tag red';
+      citasTagEl.textContent = 'Atraso';
+    }
+  }
 
-  document.getElementById('matrixMeta').textContent = state.agents.length + ' agentes · Semana ' + week + ' en curso';
-  document.getElementById('tabAgentsCount').textContent = state.agents.length;
-  document.getElementById('tabDelCount').textContent = cov + '/' + PROGRAM.totalEntregables;
+  if (solicitudEl) solicitudEl.textContent = totals.solicitudes;
+  if (polizaEl) polizaEl.textContent = totals.polizas;
+  if (delDoneEl) delDoneEl.textContent = coveredDeliverables;
+  if (delPctEl) delPctEl.textContent = delPct + '% avance';
+  if (heroFillEl) heroFillEl.style.width = avanceReal + '%';
+  if (heroTodayEl) heroTodayEl.innerHTML = 'Hoy · <strong>Sem ' + week + '</strong> · avance real <strong>' + avanceReal + '%</strong>';
+  if (matrixMetaEl) matrixMetaEl.textContent = state.agents.length + ' agentes · Semana ' + week + ' en curso';
+  if (tabAgentsCountEl) tabAgentsCountEl.textContent = state.agents.length;
+  if (tabDelCountEl) tabDelCountEl.textContent = coveredDeliverables + '/' + program.totalEntregables;
+
+  const hbMaterialesEl = document.getElementById('hbMateriales');
+  const hbCitasEl = document.getElementById('hbCitas');
+  const hbInduccionesEl = document.getElementById('hbInducciones');
+  const hbTotalEl = document.getElementById('hbTotal');
+  if (hbMaterialesEl) hbMaterialesEl.textContent = delPct + '%';
+  if (hbCitasEl) hbCitasEl.textContent = citasPct + '%';
+  if (hbInduccionesEl) hbInduccionesEl.textContent = induccionesPct + '%';
+  if (hbTotalEl) hbTotalEl.textContent = avanceReal + '%';
 
   renderMatrix();
   renderNextSteps();
+  renderExtConversions();
+  renderAgentProgressTable();
+  renderCierresTable_v53();
 }
 
 function renderNextSteps() {
@@ -54,12 +90,12 @@ function renderNextSteps() {
     el.innerHTML = '<p style="color:var(--text-muted); font-size:12px; font-style:italic; padding:16px">No hay próximos pasos definidos. Usa "✎ Editar lista" para agregarlos.</p>';
     return;
   }
-  el.innerHTML = items.map(it =>
+  el.innerHTML = items.map(item =>
     '<div class="finding">' +
-      '<div class="finding-icon ' + (it.icon || 'teal') + '">▸</div>' +
+      '<div class="finding-icon ' + (item.icon || 'teal') + '">▸</div>' +
       '<div class="finding-content">' +
-        '<div class="finding-title">' + escapeHtml(it.title) + '</div>' +
-        '<div class="finding-text">' + escapeHtml(it.text) + '</div>' +
+        '<div class="finding-title">' + escapeHtml(item.title) + '</div>' +
+        '<div class="finding-text">' + escapeHtml(item.text) + '</div>' +
       '</div>' +
     '</div>'
   ).join('');
@@ -67,185 +103,65 @@ function renderNextSteps() {
 
 function renderMatrix() {
   const tbody = document.getElementById('matrixBody');
-  const semMap = { excelente:'green', bien:'blue', atencion:'amber', critico:'red', inicio:'gray' };
-  tbody.innerHTML = state.agents.map(a => {
-    const s = agentStats(a.id);
-    const sem = agentSemaforo(s);
-    const nc = n => n === 0 ? 'num zero' : 'num';
-    return '<tr onclick="goToAgent(\'' + a.id + '\')" style="cursor:pointer">' +
-      '<td><div class="agent-cell"><div class="agent-avatar">' + a.initials + '</div>' +
-      '<div><div class="agent-info-name">' + escapeHtml(a.name) + '</div>' +
-      '<div class="agent-info-tag">' + escapeHtml(a.tag) + '</div></div></div></td>' +
-      '<td class="' + nc(s.iniciales) + '">' + s.iniciales + '</td>' +
-      '<td class="' + nc(s.cierres) + '">' + s.cierres + '</td>' +
-      '<td class="' + nc(s.solicitudes) + '">' + s.solicitudes + '</td>' +
-      '<td class="' + nc(s.polizas) + '">' + s.polizas + '</td>' +
-      '<td class="' + nc(s.reagend) + '">' + s.reagend + '</td>' +
-      '<td class="' + nc(s.cancel) + '">' + s.cancel + '</td>' +
-      '<td><span class="status-pill ' + semMap[sem.level] + '">' + sem.text + '</span></td>' +
+  if (!tbody) return;
+  const semMap = { excelente: 'green', bien: 'blue', atencion: 'amber', critico: 'red', inicio: 'gray' };
+  tbody.innerHTML = state.agents.map(agent => {
+    const stats = agentStats(agent.id);
+    const semaforo = agentSemaforo(stats);
+    const numClass = value => value === 0 ? 'num zero' : 'num';
+    return '<tr onclick="goToAgent(\'' + agent.id + '\')" style="cursor:pointer">' +
+      '<td><div class="agent-cell"><div class="agent-avatar">' + agent.initials + '</div>' +
+      '<div><div class="agent-info-name">' + escapeHtml(agent.name) + '</div>' +
+      '<div class="agent-info-tag">' + escapeHtml(agent.tag) + '</div></div></div></td>' +
+      '<td class="' + numClass(stats.iniciales) + '">' + stats.iniciales + '</td>' +
+      '<td class="' + numClass(stats.cierres) + '">' + stats.cierres + '</td>' +
+      '<td class="' + numClass(stats.solicitudes) + '">' + stats.solicitudes + '</td>' +
+      '<td class="' + numClass(stats.polizas) + '">' + stats.polizas + '</td>' +
+      '<td class="' + numClass(stats.reagend) + '">' + stats.reagend + '</td>' +
+      '<td class="' + numClass(stats.cancel) + '">' + stats.cancel + '</td>' +
+      '<td><span class="status-pill ' + semMap[semaforo.level] + '">' + semaforo.text + '</span></td>' +
       '</tr>';
   }).join('');
-}
-
-/* ================================================================
-   DELIVERABLES
-================================================================ */
-function countDeliverablesCovered() {
-  let count = 0;
-  DELIVERABLES_TEMPLATE.forEach(group => {
-    group.items.forEach(item => {
-      const key = group.group + '::' + item.name;
-      const st = state.deliverables[key]?.status;
-      if (st === 'entregado' || st === 'sustituido') count++;
-    });
-  });
-  return count;
-}
-
-function renderDeliverables() {
-  // Extras
-  document.getElementById('extrasList').innerHTML = (state.extras || []).map(e =>
-    '<div class="extra-item"><div class="extra-item-title">' + escapeHtml(e.title) + '</div><div class="extra-item-desc">' + escapeHtml(e.desc) + '</div></div>'
-  ).join('');
-
-  // Fase 2 items (pull deliverables con status fase2)
-  const fase2Items = [];
-  DELIVERABLES_TEMPLATE.forEach(group => {
-    group.items.forEach(item => {
-      const key = group.group + '::' + item.name;
-      const data = state.deliverables[key] || {};
-      if (data.status === 'fase2') {
-        fase2Items.push({ name: item.name, group: group.group, note: data.note || item.defaultNote });
-      }
-    });
-  });
-  document.getElementById('fase2List').innerHTML = fase2Items.length === 0
-    ? '<p style="color:var(--text-muted); font-size:12px; font-style:italic">No hay entregables reprogramados aún.</p>'
-    : fase2Items.map((f, i) =>
-        '<div class="fase2-item"><div class="fase2-item-icon">' + (i+1) + '</div>' +
-        '<div class="fase2-item-text"><strong>' + escapeHtml(f.name) + '</strong> · ' + escapeHtml(f.group) + '<br>' +
-        '<span class="fase2-item-note">' + escapeHtml(f.note || '') + '</span></div></div>'
-      ).join('');
-
-  // Grupos contrato
-  const container = document.getElementById('delGroups');
-  let totalItems = 0, coveredItems = 0;
-  container.innerHTML = DELIVERABLES_TEMPLATE.map((group, gi) => {
-    const visibleItems = group.items.filter(item => {
-      const key = group.group + '::' + item.name;
-      return state.deliverables[key]?.status !== 'fase2';
-    });
-    const groupCovered = visibleItems.filter(item => {
-      const st = state.deliverables[group.group + '::' + item.name]?.status;
-      return st === 'entregado' || st === 'sustituido';
-    }).length;
-    totalItems += group.items.length;
-    coveredItems += group.items.filter(item => {
-      const st = state.deliverables[group.group + '::' + item.name]?.status;
-      return st === 'entregado' || st === 'sustituido';
-    }).length;
-    const groupNum = String(gi + 1).padStart(2, '0');
-    if (visibleItems.length === 0) return '';
-
-    return '<div class="del-group" data-group="' + gi + '">' +
-      '<div class="del-group-head" onclick="toggleGroup(' + gi + ')">' +
-        '<div class="del-group-num">' + groupNum + '</div>' +
-        '<div class="del-group-title">' + escapeHtml(group.group) + '</div>' +
-        '<div class="del-group-count">' + groupCovered + '/' + visibleItems.length + '</div>' +
-        '<div class="del-group-chevron">▼</div>' +
-      '</div>' +
-      '<div class="del-group-body">' +
-      visibleItems.map(item => {
-        const key = group.group + '::' + item.name;
-        const data = state.deliverables[key] || { status: 'pendiente', note: '', date: '', link: '' };
-        return '<div class="del-item">' +
-          '<div class="del-item-head">' +
-          '<button class="del-status-badge ' + data.status + '" onclick="openStatusMenu(event, \'' + escapeAttr(key) + '\')">' + labelStatus(data.status) + '</button>' +
-          '<div class="del-name">' + escapeHtml(item.name) + '</div>' +
-          '</div>' +
-          '<div class="del-field-group">' +
-          '<input type="date" class="del-date-field" value="' + (data.date || '') + '" onchange="setDelField(\'' + escapeAttr(key) + '\',\'date\',this.value)" title="Fecha de entrega">' +
-          '<input type="text" class="del-link-field" placeholder="Link, ruta o referencia" value="' + escapeHtml(data.link || '') + '" onchange="setDelField(\'' + escapeAttr(key) + '\',\'link\',this.value)">' +
-          '</div>' +
-          '<textarea class="del-note-field" placeholder="Nota, justificación..." onchange="setDelField(\'' + escapeAttr(key) + '\',\'note\',this.value)">' + escapeHtml(data.note || '') + '</textarea>' +
-          '</div>';
-      }).join('') +
-      '</div></div>';
-  }).join('');
-
-  document.getElementById('delStatDone').textContent = coveredItems;
-  document.getElementById('delStatPending').textContent = totalItems - coveredItems;
-  const pct = Math.round((coveredItems / totalItems) * 100);
-  document.getElementById('delStatPct').textContent = pct + '%';
-  document.getElementById('delSumBar').style.width = pct + '%';
-}
-
-function labelStatus(s) {
-  return { entregado:'Entregado', sustituido:'Sustituido', progreso:'En progreso', diferido:'Diferido', pendiente:'Pendiente', fase2:'Fase 2' }[s] || s;
-}
-
-function toggleGroup(gi) {
-  const el = document.querySelector('[data-group="' + gi + '"]');
-  if (el) el.classList.toggle('collapsed');
-}
-
-function setDelField(key, field, value) {
-  if (!state.deliverables[key]) state.deliverables[key] = {};
-  state.deliverables[key][field] = value;
-  saveState();
-  if (field === 'status') { renderDeliverables(); renderDashboard(); }
-}
-
-/* Status menu */
-let activeStatusKey = null;
-function openStatusMenu(event, key) {
-  event.stopPropagation();
-  activeStatusKey = key;
-  const menu = document.getElementById('statusMenu');
-  const rect = event.target.getBoundingClientRect();
-  menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
-  menu.style.left = (rect.left + window.scrollX) + 'px';
-  menu.classList.add('open');
 }
 
 function renderExtConversions() {
   const el = document.getElementById('extConvGrid');
   if (!el) return;
-  const c = calculateNewConversions();
-  if (c.totalProspects === 0) {
+  const conversions = calculateNewConversions();
+  if (conversions.totalProspects === 0) {
     el.innerHTML = '<p style="color:var(--text-muted); font-size:12px; font-style:italic; padding:16px; grid-column: 1/-1">Sin prospectos registrados aún.</p>';
     return;
   }
   el.innerHTML =
     '<div class="ext-conv-item">' +
       '<div class="ext-conv-label">Inicial → Cierre</div>' +
-      '<div class="ext-conv-val">' + c.inicialACierre + '%</div>' +
-      '<div class="ext-conv-sub">' + c.cierre + ' de ' + c.inicial + ' prospectos avanzaron</div>' +
+      '<div class="ext-conv-val">' + conversions.inicialACierre + '%</div>' +
+      '<div class="ext-conv-sub">' + conversions.cierre + ' de ' + conversions.inicial + ' prospectos avanzaron</div>' +
     '</div>' +
     '<div class="ext-conv-item cierre">' +
       '<div class="ext-conv-label">Cierre → Solicitud</div>' +
-      '<div class="ext-conv-val">' + c.cierreASolicitud + '%</div>' +
-      '<div class="ext-conv-sub">' + c.solicitud + ' de ' + c.cierre + ' firmaron solicitud</div>' +
+      '<div class="ext-conv-val">' + conversions.cierreASolicitud + '%</div>' +
+      '<div class="ext-conv-sub">' + conversions.solicitud + ' de ' + conversions.cierre + ' firmaron solicitud</div>' +
     '</div>' +
     '<div class="ext-conv-item solicitud">' +
       '<div class="ext-conv-label">Solicitud → Póliza</div>' +
-      '<div class="ext-conv-val">' + c.solicitudAPoliza + '%</div>' +
-      '<div class="ext-conv-sub">' + c.poliza + ' de ' + c.solicitud + ' emitieron póliza</div>' +
+      '<div class="ext-conv-val">' + conversions.solicitudAPoliza + '%</div>' +
+      '<div class="ext-conv-sub">' + conversions.poliza + ' de ' + conversions.solicitud + ' emitieron póliza</div>' +
     '</div>' +
     '<div class="ext-conv-item poliza">' +
       '<div class="ext-conv-label">Embudo total · Inicial → Póliza</div>' +
-      '<div class="ext-conv-val">' + c.inicialAPoliza + '%</div>' +
-      '<div class="ext-conv-sub">' + c.poliza + ' de ' + c.inicial + ' llegaron al final</div>' +
+      '<div class="ext-conv-val">' + conversions.inicialAPoliza + '%</div>' +
+      '<div class="ext-conv-sub">' + conversions.poliza + ' de ' + conversions.inicial + ' llegaron al final</div>' +
     '</div>';
 }
 
 function renderAgentProgressTable() {
   const container = document.getElementById('agentProgressTable');
   if (!container) return;
-  const rows = state.agents.map(a => {
-    const prog = calculateAgentWeightedProgress(a.id);
-    return { agent: a, prog };
-  }).sort((x, y) => y.prog.avgPct - x.prog.avgPct);
+  const rows = state.agents.map(agent => ({
+    agent,
+    progress: calculateAgentWeightedProgress(agent.id),
+  })).sort((left, right) => right.progress.avgPct - left.progress.avgPct);
 
   if (rows.length === 0) {
     container.innerHTML = '<p style="color:var(--text-muted); font-size:12px; font-style:italic; padding:16px">Sin agentes registrados.</p>';
@@ -259,27 +175,28 @@ function renderAgentProgressTable() {
     '<th>Progreso promedio</th>' +
     '</tr></thead><tbody>';
 
-  rows.forEach(r => {
-    const sc = r.prog.stageCount;
-    const isHigh = r.prog.avgPct >= 75;
+  rows.forEach(row => {
+    const stageCount = row.progress.stageCount;
+    const isHigh = row.progress.avgPct >= 75;
     html += '<tr>' +
-      '<td><div class="prospect-name-cell">' + escapeHtml(r.agent.name) + '</div>' +
-        '<div class="prospect-agent-sub">' + escapeHtml(r.agent.tag || '') + '</div></td>' +
-      '<td><span class="prospect-last-activity">' + r.prog.totalProspects + '</span></td>' +
+      '<td><div class="prospect-name-cell">' + escapeHtml(row.agent.name) + '</div>' +
+        '<div class="prospect-agent-sub">' + escapeHtml(row.agent.tag || '') + '</div></td>' +
+      '<td><span class="prospect-last-activity">' + row.progress.totalProspects + '</span></td>' +
       '<td><div class="prospect-stages-mini">' +
-        '<div class="prospect-stage-dot' + (sc.inicial > 0 ? ' done' : '') + '" title="Iniciales: ' + sc.inicial + '">I</div>' +
-        '<div class="prospect-stage-dot' + (sc.cierre > 0 ? ' done' : '') + '" title="Cierres: ' + sc.cierre + '">C</div>' +
-        '<div class="prospect-stage-dot' + (sc.solicitud > 0 ? ' done' : '') + '" title="Solicitudes: ' + sc.solicitud + '">S</div>' +
-        '<div class="prospect-stage-dot' + (sc.poliza > 0 ? ' done final' : '') + '" title="Pólizas: ' + sc.poliza + '">P</div>' +
+        '<div class="prospect-stage-dot' + (stageCount.inicial > 0 ? ' done' : '') + '" title="Iniciales: ' + stageCount.inicial + '">I</div>' +
+        '<div class="prospect-stage-dot' + (stageCount.cierre > 0 ? ' done' : '') + '" title="Cierres: ' + stageCount.cierre + '">C</div>' +
+        '<div class="prospect-stage-dot' + (stageCount.solicitud > 0 ? ' done' : '') + '" title="Solicitudes: ' + stageCount.solicitud + '">S</div>' +
+        '<div class="prospect-stage-dot' + (stageCount.poliza > 0 ? ' done final' : '') + '" title="Pólizas: ' + stageCount.poliza + '">P</div>' +
       '</div></td>' +
       '<td><div class="prospect-progress-bar">' +
         '<div class="prospect-progress-bar-track">' +
-          '<div class="prospect-progress-bar-fill' + (isHigh ? ' complete' : '') + '" style="width:' + r.prog.avgPct + '%"></div>' +
+          '<div class="prospect-progress-bar-fill' + (isHigh ? ' complete' : '') + '" style="width:' + row.progress.avgPct + '%"></div>' +
         '</div>' +
-        '<span class="prospect-progress-pct">' + r.prog.avgPct + '%</span>' +
+        '<span class="prospect-progress-pct">' + row.progress.avgPct + '%</span>' +
       '</div></td>' +
       '</tr>';
   });
+
   html += '</tbody></table>';
   container.innerHTML = html;
 }
