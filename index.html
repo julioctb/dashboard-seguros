@@ -6,6 +6,7 @@
 <title>Seguimiento Bienestar Patrimonial · Paquete 1</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/portal.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="src/config/backend.js"></script>
 <script src="src/data/default-state.js"></script>
 <script src="src/data/preload-state.js"></script>
@@ -15,9 +16,9 @@
 <body>
 
 <!-- TOP BAR -->
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="brand">
+<header class="topbar folio-header">
+  <div class="topbar-inner folio-header-main">
+    <div class="brand dossier-brand">
       <div class="brand-badge" id="brandBadgeText">BIENESTAR PATRIMONIAL</div>
       <div class="brand-text">
         <div class="brand-name" id="brandNameText">Seguimiento · Paquete 1</div>
@@ -25,12 +26,35 @@
       </div>
     </div>
     <div class="top-actions">
-      <button class="top-btn ghost" onclick="openPaymentModal()"><span>💰</span> Pagos</button>
-      <button class="top-btn ghost" onclick="exportData()"><span>⬇</span> Respaldar</button>
-      <button class="top-btn ghost" onclick="document.getElementById('importFileInput').click()"><span>⬆</span> Importar</button>
+      <div class="session-badge" id="sessionBadge" hidden>
+        <div class="session-badge-main" id="sessionBadgeText">Sin sesión</div>
+        <div class="session-badge-meta" id="sessionBadgeMeta">Sesión</div>
+      </div>
+      <button class="top-btn ghost" id="topPaymentsBtn" onclick="openPaymentModal()"><span>¤</span> Pagos</button>
+      <button class="top-btn ghost" id="topExportBtn" onclick="exportData()"><span>⇣</span> Respaldar</button>
+      <button class="top-btn ghost" id="topImportBtn" onclick="document.getElementById('importFileInput').click()"><span>⇡</span> Importar</button>
       <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(event)">
-      <button class="top-btn ghost" onclick="window.print()"><span>🖨</span> PDF</button>
-      <button class="top-btn amber" onclick="openActivityModal()"><span>+</span> Registrar actividad</button>
+      <button class="top-btn ghost" id="topPrintBtn" onclick="window.print()"><span>⎙</span> PDF</button>
+      <button class="top-btn amber" id="topNewActivityBtn" onclick="openActivityModal()"><span>+</span> Registrar actividad</button>
+      <button class="top-btn ghost" id="logoutBtn" onclick="performPortalLogout()" hidden><span>⎋</span> Salir</button>
+    </div>
+  </div>
+  <div class="topbar-inner folio-status-strip">
+    <div class="folio-status-item">
+      <div class="folio-status-label">Fase activa</div>
+      <div class="folio-status-value" id="shellPhaseTitleText">Programa de Desarrollo Comercial · Fase 1</div>
+    </div>
+    <div class="folio-status-item">
+      <div class="folio-status-label">Periodo</div>
+      <div class="folio-status-value" id="shellProgramTimelineText">25 mar → 6 may 2026 · 6 semanas · $29,000 MXN</div>
+    </div>
+    <div class="folio-status-item">
+      <div class="folio-status-label">Monto</div>
+      <div class="folio-status-value" id="shellProgramAmountText">$29,000 MXN</div>
+    </div>
+    <div class="folio-status-item">
+      <div class="folio-status-label">Semana en curso</div>
+      <div class="folio-status-value"><span id="shellCurrentWeekNum">1</span> / <span id="shellTotalWeeksText">6</span></div>
     </div>
   </div>
 </header>
@@ -38,10 +62,10 @@
 <!-- TABS -->
 <nav class="tabs-bar">
   <div class="tabs-inner">
-    <button class="tab active" data-view="dashboard"><span>⬢</span> Dashboard</button>
-    <button class="tab" data-view="agents"><span>◉</span> Por agente <span class="tab-pill" id="tabAgentsCount">6</span></button>
-    <button class="tab" data-view="deliverables"><span>▣</span> Entregables <span class="tab-pill" id="tabDelCount">0/21</span></button>
-    <button class="tab" data-view="admin"><span>⚙</span> Administrador</button>
+    <button class="tab active" data-view="dashboard"><span>⬢</span> Mesa general</button>
+    <button class="tab" data-view="agents"><span>◉</span> Bitácora <span class="tab-pill" id="tabAgentsCount">6</span></button>
+    <button class="tab" data-view="deliverables"><span>▣</span> Contrato <span class="tab-pill" id="tabDelCount">0/21</span></button>
+    <button class="tab" data-view="admin"><span>⚙</span> Control</button>
   </div>
 </nav>
 
@@ -49,223 +73,244 @@
 
   <!-- DASHBOARD -->
   <section class="view active" id="view-dashboard">
+    <div class="program-folio module-card">
+      <div class="folio-rail"></div>
+      <div class="program-folio-shell">
+        <div class="hero-top program-folio-head">
+          <div class="program-folio-copy">
+            <div class="hero-title" id="heroTitleText">Programa de Desarrollo Comercial · Fase 1</div>
+            <div class="hero-h1" id="heroH1Text">Arranque y Estabilización</div>
+            <div class="hero-sub" id="heroSubText">25 mar → 6 may 2026 · 6 semanas · $29,000 MXN</div>
+          </div>
+          <div class="hero-week program-folio-week">
+            <div class="hero-week-label">Semana actual</div>
+            <div class="hero-week-num" id="currentWeekNum">3</div>
+            <div class="program-folio-week-copy">Lectura operativa del tramo vigente</div>
+          </div>
+        </div>
+        <div class="hero-progress-wrap program-folio-progress">
+          <div class="hero-progress-bar">
+            <div class="hero-progress-fill" id="heroProgressFill" style="width: 0%"></div>
+          </div>
+          <div class="hero-progress-labels">
+            <span id="heroRangeStartText">Semana 1 · <strong>25 mar</strong></span>
+            <span id="heroTodayLabel">Hoy</span>
+            <span id="heroRangeEndText">Semana 6 · <strong>6 may 2026</strong></span>
+          </div>
 
-    <div class="hero">
-      <div class="hero-top">
-        <div>
-          <div class="hero-title" id="heroTitleText">Programa de Desarrollo Comercial · Fase 1</div>
-          <div class="hero-h1" id="heroH1Text">Arranque y Estabilización</div>
-          <div class="hero-sub" id="heroSubText">25 mar → 6 may 2026 · 6 semanas · $29,000 MXN</div>
-        </div>
-        <div class="hero-week">
-          <div class="hero-week-num" id="currentWeekNum">3</div>
-          <div class="hero-week-label">Semana actual</div>
-        </div>
-      </div>
-      <div class="hero-progress-wrap">
-        <div class="hero-progress-bar">
-          <div class="hero-progress-fill" id="heroProgressFill" style="width: 0%"></div>
-        </div>
-        <div class="hero-progress-labels">
-          <span>Semana 1 · <strong>25 mar</strong></span>
-          <span id="heroTodayLabel">Hoy</span>
-          <span>Semana 6 · <strong>6 may</strong></span>
-        </div>
-
-        <!-- v5.2 · Desglose del avance real del programa -->
-        <div class="hero-breakdown" id="heroBreakdown">
-          <div class="hero-breakdown-item" title="Materiales / entregables cubiertos">
-            <div class="hero-breakdown-label">Materiales</div>
-            <div class="hero-breakdown-value" id="hbMateriales">0%</div>
-            <div class="hero-breakdown-weight">peso 40%</div>
-          </div>
-          <div class="hero-breakdown-item" title="Citas consumidas sobre 35 contratadas">
-            <div class="hero-breakdown-label">Citas</div>
-            <div class="hero-breakdown-value" id="hbCitas">0%</div>
-            <div class="hero-breakdown-weight">peso 40%</div>
-          </div>
-          <div class="hero-breakdown-item" title="Inducciones de 5 días completadas">
-            <div class="hero-breakdown-label">Inducciones</div>
-            <div class="hero-breakdown-value" id="hbInducciones">0%</div>
-            <div class="hero-breakdown-weight">peso 20%</div>
-            <button class="hero-breakdown-edit" onclick="openInduccionesModal()" title="Editar inducciones">✎</button>
-          </div>
-          <div class="hero-breakdown-item total">
-            <div class="hero-breakdown-label">Avance real</div>
-            <div class="hero-breakdown-value" id="hbTotal">0%</div>
-            <div class="hero-breakdown-weight">ponderado</div>
+          <div class="hero-breakdown" id="heroBreakdown">
+            <div class="hero-breakdown-item" title="Materiales / entregables cubiertos">
+              <div class="hero-breakdown-label">Materiales</div>
+              <div class="hero-breakdown-value" id="hbMateriales">0%</div>
+              <div class="hero-breakdown-weight">peso 40%</div>
+            </div>
+            <div class="hero-breakdown-item" title="Citas consumidas sobre 35 contratadas">
+              <div class="hero-breakdown-label">Citas</div>
+              <div class="hero-breakdown-value" id="hbCitas">0%</div>
+              <div class="hero-breakdown-weight">peso 40%</div>
+            </div>
+            <div class="hero-breakdown-item" title="Inducciones de 5 días completadas">
+              <div class="hero-breakdown-label">Inducciones</div>
+              <div class="hero-breakdown-value" id="hbInducciones">0%</div>
+              <div class="hero-breakdown-weight">peso 20%</div>
+              <button class="hero-breakdown-edit" onclick="openInduccionesModal()" title="Editar inducciones">✎</button>
+            </div>
+            <div class="hero-breakdown-item total">
+              <div class="hero-breakdown-label">Avance real</div>
+              <div class="hero-breakdown-value" id="hbTotal">0%</div>
+              <div class="hero-breakdown-weight">ponderado</div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-
-    <div class="kpi-grid">
-      <div class="kpi">
-        <div class="kpi-label">Citas consumidas</div>
-        <div class="kpi-value"><span id="kpiCitasDone">0</span><span class="denom">/35</span></div>
-        <div class="kpi-sub" id="kpiCitasPct">0% del contrato</div>
-        <span class="kpi-tag green" id="kpiCitasTag">En ruta</span>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Solicitudes llenadas</div>
-        <div class="kpi-value" id="kpiSolicitud">0</div>
-        <div class="kpi-sub">paso previo a póliza</div>
-        <span class="kpi-tag amber">En proceso</span>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Pólizas emitidas</div>
-        <div class="kpi-value" id="kpiPoliza">0</div>
-        <div class="kpi-sub">ciclo completo 100%</div>
-        <span class="kpi-tag blue">Final</span>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Entregables cubiertos</div>
-        <div class="kpi-value"><span id="kpiDelDone">0</span><span class="denom">/21</span></div>
-        <div class="kpi-sub" id="kpiDelPct">0% avance</div>
-        <span class="kpi-tag blue" id="kpiDelTag">En progreso</span>
+        <div class="program-kpi-grid">
+          <div class="kpi program-kpi">
+            <div class="kpi-label">Citas consumidas</div>
+            <div class="kpi-value"><span id="kpiCitasDone">0</span><span class="denom" id="kpiCitasDenom">/35</span></div>
+            <div class="kpi-sub" id="kpiCitasPct">0% del contrato</div>
+            <span class="kpi-tag green" id="kpiCitasTag">En ruta</span>
+          </div>
+          <div class="kpi program-kpi">
+            <div class="kpi-label">Solicitudes llenadas</div>
+            <div class="kpi-value" id="kpiSolicitud">0</div>
+            <div class="kpi-sub">paso previo a póliza</div>
+            <span class="kpi-tag amber">En proceso</span>
+          </div>
+          <div class="kpi program-kpi">
+            <div class="kpi-label">Pólizas emitidas</div>
+            <div class="kpi-value" id="kpiPoliza">0</div>
+            <div class="kpi-sub">ciclo completo 100%</div>
+            <span class="kpi-tag blue">Final</span>
+          </div>
+          <div class="kpi program-kpi">
+            <div class="kpi-label">Entregables cubiertos</div>
+            <div class="kpi-value"><span id="kpiDelDone">0</span><span class="denom" id="kpiDelDenom">/21</span></div>
+            <div class="kpi-sub" id="kpiDelPct">0% avance</div>
+            <span class="kpi-tag blue" id="kpiDelTag">En progreso</span>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="section">
       <div class="section-header">
-        <div class="section-title">
-          <span class="section-title-badge">01</span>
-          Matriz de actividad por agente
+        <div>
+          <div class="section-eyebrow">Riesgos y siguientes movimientos</div>
+          <div class="section-title">Lectura ejecutiva de la cartera</div>
+        </div>
+        <button class="extras-edit-btn dark" onclick="openNextStepsModal()">✎ Editar próximos pasos</button>
+      </div>
+      <div class="module-grid-two">
+        <div class="module-card module-card-ink">
+          <div class="module-head">
+            <div>
+              <div class="module-eyebrow">Hallazgos</div>
+              <div class="module-title">Dónde está la tracción real</div>
+            </div>
+          </div>
+          <div class="findings-card findings-card-plain">
+            <div class="finding">
+              <div class="finding-icon teal">✓</div>
+              <div class="finding-content">
+                <div class="finding-title">Katia y Ana concentran la actividad útil</div>
+                <div class="finding-text">Son las dos agentes donde el ciclo comercial completa etapas. Recomendamos mantener el enfoque aquí las próximas 3 semanas.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <div class="finding-icon amber">!</div>
+              <div class="finding-content">
+                <div class="finding-title">Liz con ciclo avanzado pero cierres se caen</div>
+                <div class="finding-text">3 citas iniciales efectivas, 3 cierres programados: 2 reagendadas y 1 perdida. Punto a trabajar: calidad de la propuesta previa al cierre.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <div class="finding-icon red">×</div>
+              <div class="finding-content">
+                <div class="finding-title">Jorge: 3 iniciales canceladas al 100%</div>
+                <div class="finding-text">Todas sus citas se empalmaron con las de Katia y Ana. Problema de agenda y compromiso del prospecto, no de proceso.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <div class="finding-icon purple">✎</div>
+              <div class="finding-content">
+                <div class="finding-title">Eva · perfil cliente no calificado</div>
+                <div class="finding-text">Zoom desde Salina Cruz. Los prospectos no muestran interés o ya tienen seguros de vida. Requiere reforzar filtro de prospección.</div>
+              </div>
+            </div>
+            <div class="finding">
+              <div class="finding-icon amber">◐</div>
+              <div class="finding-content">
+                <div class="finding-title">Vicente sin activación</div>
+                <div class="finding-text">No ha respondido a Blanca ni ha agendado. Punto de decisión: definir estatus contractual antes de Semana 4.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="module-card">
+          <div class="module-head">
+            <div>
+              <div class="module-eyebrow">Próximos pasos</div>
+              <div class="module-title">Tramo operativo semanas 4 a 6</div>
+            </div>
+          </div>
+          <div class="findings-card findings-card-plain" id="nextStepsList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-eyebrow">Cartera por agente</div>
+          <div class="section-title">Actividad y profundidad de avance</div>
         </div>
         <div class="section-meta" id="matrixMeta">6 agentes · Semanas 1-3 ejecutadas</div>
       </div>
-      <div class="agent-matrix">
-        <table class="matrix-table">
-          <thead>
-            <tr>
-              <th>Agente</th>
-              <th class="num">Inicial</th>
-              <th class="num">Cierre</th>
-              <th class="num">Solicitud</th>
-              <th class="num">Póliza</th>
-              <th class="num">Reagend.</th>
-              <th class="num">Cancel.</th>
-              <th>Semáforo</th>
-            </tr>
-          </thead>
-          <tbody id="matrixBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">
-          <span class="section-title-badge">02</span>
-          Hallazgos clave · 3 semanas
-        </div>
-      </div>
-      <div class="findings-card">
-        <div class="finding">
-          <div class="finding-icon teal">✓</div>
-          <div class="finding-content">
-            <div class="finding-title">Katia y Ana concentran la actividad útil</div>
-            <div class="finding-text">Son las dos agentes donde el ciclo comercial completa etapas. Recomendamos mantener el enfoque aquí las próximas 3 semanas.</div>
+      <div class="section-stack">
+        <div class="module-card">
+          <div class="module-head">
+            <div>
+              <div class="module-eyebrow">Matriz operativa</div>
+              <div class="module-title">Movimiento reciente por agente</div>
+            </div>
+          </div>
+          <div class="agent-matrix">
+            <table class="matrix-table ledger-table">
+              <thead>
+                <tr>
+                  <th>Agente</th>
+                  <th class="num">Inicial</th>
+                  <th class="num">Cierre</th>
+                  <th class="num">Solicitud</th>
+                  <th class="num">Póliza</th>
+                  <th class="num">Reagend.</th>
+                  <th class="num">Cancel.</th>
+                  <th>Semáforo</th>
+                </tr>
+              </thead>
+              <tbody id="matrixBody"></tbody>
+            </table>
           </div>
         </div>
-        <div class="finding">
-          <div class="finding-icon amber">!</div>
-          <div class="finding-content">
-            <div class="finding-title">Liz con ciclo avanzado pero cierres se caen</div>
-            <div class="finding-text">3 citas iniciales efectivas, 3 cierres programados: 2 reagendadas y 1 perdida. Punto a trabajar: calidad de la propuesta previa al cierre.</div>
+        <div class="module-card">
+          <div class="module-head">
+            <div>
+              <div class="module-eyebrow">Lectura ponderada</div>
+              <div class="module-title">Madurez promedio del embudo por agente</div>
+            </div>
+            <div class="module-meta">% promedio del flujo por agente · Pesos Inicial(30) · Cierre(20) · Solicitud(20) · Póliza(30)</div>
           </div>
-        </div>
-        <div class="finding">
-          <div class="finding-icon red">×</div>
-          <div class="finding-content">
-            <div class="finding-title">Jorge: 3 iniciales canceladas al 100%</div>
-            <div class="finding-text">Todas sus citas se empalmaron con las de Katia y Ana. Problema de agenda y compromiso del prospecto, no de proceso.</div>
-          </div>
-        </div>
-        <div class="finding">
-          <div class="finding-icon purple">✎</div>
-          <div class="finding-content">
-            <div class="finding-title">Eva · perfil cliente no calificado</div>
-            <div class="finding-text">Zoom desde Salina Cruz. Los prospectos no muestran interés o ya tienen seguros de vida. Requiere reforzar filtro de prospección.</div>
-          </div>
-        </div>
-        <div class="finding">
-          <div class="finding-icon amber">◐</div>
-          <div class="finding-content">
-            <div class="finding-title">Vicente sin activación</div>
-            <div class="finding-text">No ha respondido a Blanca ni ha agendado. Punto de decisión: definir estatus contractual antes de Semana 4.</div>
-          </div>
+          <div id="agentProgressTable"></div>
         </div>
       </div>
     </div>
 
     <div class="section">
       <div class="section-header">
-        <div class="section-title">
-          <span class="section-title-badge">03</span>
-          Próximos pasos · Semanas 4-6
+        <div>
+          <div class="section-eyebrow">Embudo y backlog</div>
+          <div class="section-title">Conversión de prospectos y cierres por armar</div>
         </div>
-        <button class="extras-edit-btn dark" onclick="openNextStepsModal()">✎ Editar lista</button>
+        <div class="section-meta">Cálculo por prospecto único y cotizaciones pendientes de preparar</div>
       </div>
-      <div class="findings-card" id="nextStepsList"></div>
-    </div>
-
-    <!-- v5 · Sección "Progreso por prospecto" movida a la vista Por agente (sub-tab bitácora) -->
-
-    <!-- NUEVO v4.1 · CONVERSIONES EXTENDIDAS (aditivo, no toca las del medidor actual) -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">
-          <span class="section-title-badge">04</span>
-          Conversiones extendidas · Por etapa
+      <div class="module-grid-two">
+        <div class="module-card">
+          <div class="module-head">
+            <div>
+              <div class="module-eyebrow">Conversión</div>
+              <div class="module-title">Progreso del embudo por etapa</div>
+            </div>
+            <div class="module-meta">Lectura extendida por prospecto único</div>
+          </div>
+          <div id="extConvGrid" class="ext-conv-grid"></div>
         </div>
-        <div class="section-meta">Cálculo por prospecto único · Complementa el ciclo</div>
-      </div>
-      <div class="prospect-progress-section">
-        <div id="extConvGrid" class="ext-conv-grid"></div>
-      </div>
-    </div>
-
-    <!-- NUEVO v4.2 · PROGRESO PONDERADO POR AGENTE (aditivo, pesos 30/20/20/30) -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">
-          <span class="section-title-badge">05</span>
-          Progreso por agente · Ponderado
+        <div class="module-card">
+          <div class="module-head">
+            <div>
+              <div class="module-eyebrow">Backlog</div>
+              <div class="module-title">Cierres pendientes de expediente</div>
+            </div>
+            <div class="module-meta">Propuestas que faltan armar o pasar a HTML antes del cierre</div>
+          </div>
+          <div class="cierres-section dossier-embed">
+            <div class="cierres-toolbar">
+              <span class="cierres-toolbar-meta"><span id="cierresPendienteCount">0</span> pendientes · <span id="cierresListoCount">0</span> listos</span>
+              <button class="cierres-add-btn" onclick="openCierreModal()">+ Agregar cierre pendiente</button>
+            </div>
+            <div id="cierresTableContainer"></div>
+          </div>
         </div>
-        <div class="section-meta">% promedio del flujo por agente · Pesos Inicial(30) · Cierre(20) · Solicitud(20) · Póliza(30)</div>
-      </div>
-      <div class="prospect-progress-section">
-        <div id="agentProgressTable"></div>
       </div>
     </div>
-
-    <!-- NUEVO v5.3 · CIERRES PENDIENTES (backlog de cotizaciones de Ale) -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">
-          <span class="section-title-badge">06</span>
-          Cierres pendientes · Backlog de cotizaciones
-        </div>
-        <div class="section-meta">Propuestas que faltan armar o pasar al HTML antes del cierre</div>
-      </div>
-      <div class="cierres-section">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px">
-          <span style="font-size:12px; color:var(--text-muted)"><span id="cierresPendienteCount" style="font-weight:700; color:var(--navy)">0</span> pendientes · <span id="cierresListoCount" style="font-weight:700; color:var(--teal)">0</span> listos</span>
-          <button class="cierres-add-btn" onclick="openCierreModal()">+ Agregar cierre pendiente</button>
-        </div>
-        <div id="cierresTableContainer"></div>
-      </div>
-    </div>
-    <!-- FIN NUEVO v4.1 / v4.2 / v5.3 -->
-
   </section>
 
   <!-- AGENTS -->
   <section class="view" id="view-agents">
     <div class="section-header">
-      <div class="section-title"><span class="section-title-badge">◉</span> Bitácora por agente</div>
-      <div class="section-meta">Registro de citas + ficha de avance</div>
+      <div>
+        <div class="section-eyebrow">Bitácora</div>
+        <div class="section-title">Expedientes por agente</div>
+      </div>
+      <div class="section-meta">Registro de citas, cierres y ficha de avance</div>
     </div>
     <div class="agent-tabs" id="agentTabs"></div>
     <div id="agentPanels"></div>
@@ -275,7 +320,7 @@
   <section class="view" id="view-deliverables">
     <div class="del-summary">
       <div class="del-sum-main">
-        <div class="del-sum-label">Anexo 1 del contrato · Estado real</div>
+        <div class="del-sum-label">Hoja contractual · Estado real</div>
         <div class="del-sum-h" id="deliverablesContractTotalText">21 entregables contratados</div>
         <div class="del-sum-bar-wrap">
           <div class="del-sum-bar-fill" id="delSumBar" style="width: 0%"></div>
@@ -297,7 +342,10 @@
     </div>
 
     <div class="section-header">
-      <div class="section-title"><span class="section-title-badge">01</span> Entregables del contrato</div>
+      <div>
+        <div class="section-eyebrow">Contrato</div>
+        <div class="section-title">Entregables del expediente</div>
+      </div>
       <div class="section-meta">Haz clic en el estado para cambiarlo</div>
     </div>
     <div class="del-groups" id="delGroups"></div>
@@ -315,8 +363,11 @@
   <!-- ADMIN -->
   <section class="view" id="view-admin">
     <div class="section-header">
-      <div class="section-title"><span class="section-title-badge">⚙</span> Portal administrador</div>
-      <div class="section-meta">Configuración interna del portal, catálogos y backend</div>
+      <div>
+        <div class="section-eyebrow">Control</div>
+        <div class="section-title">Centro de configuración del portal</div>
+      </div>
+      <div class="section-meta">Programa, lenguaje, catálogos y persistencia</div>
     </div>
     <div id="adminContent"></div>
   </section>
@@ -725,6 +776,7 @@
 <div class="app-footer"><span id="appFooterBrandText">Bienestar Patrimonial</span> · <span id="appFooterProgramText">Seguimiento Paquete 1</span> · Alejandra Toledo Consultora · Datos guardados en <span id="backendStatusLabel">localStorage</span></div>
 <script src="src/store/backend.js"></script>
 <script src="src/ui/helpers.js"></script>
+<script src="src/auth.js"></script>
 <script src="src/store/state.js"></script>
 <script src="src/store/actions.js"></script>
 <script src="src/store/actions.activities.js"></script>

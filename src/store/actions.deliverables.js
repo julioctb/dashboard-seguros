@@ -5,7 +5,17 @@ function ensureCierresState() {
   if (!Array.isArray(state.cierres)) state.cierres = [];
 }
 
-function upsertCierre(data, options) {
+function syncLocalCierre(cierre) {
+  ensureCierresState();
+  const index = state.cierres.findIndex(entry => entry.id === cierre.id);
+  if (index >= 0) {
+    state.cierres[index] = cierre;
+  } else {
+    state.cierres.push(cierre);
+  }
+}
+
+async function upsertCierre(data, options) {
   ensureCierresState();
   const editId = options && options.editId ? options.editId : '';
   const payload = {
@@ -20,6 +30,24 @@ function upsertCierre(data, options) {
   };
   let previous = null;
   let current = null;
+
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && typeof isAdminUser === 'function' && !isAdminUser()) {
+    assertCanEditAgentScope(payload.agente);
+
+    if (editId) {
+      const existing = state.cierres.find(cierre => cierre.id === editId);
+      if (!existing) throw new Error('No se encontró el cierre a editar');
+      previous = { ...existing };
+      current = { ...existing, ...payload, id: editId };
+    } else {
+      current = { id: uid(), ...payload };
+    }
+
+    const savedCierre = await requestSupabaseRpc('portal_upsert_my_cierre', { p_payload: current });
+    current = savedCierre && typeof savedCierre === 'object' ? savedCierre : current;
+    syncLocalCierre(current);
+    return { previous, current, isNew: !editId, isEdit: Boolean(editId) };
+  }
 
   if (editId) {
     const index = state.cierres.findIndex(cierre => cierre.id === editId);
@@ -36,10 +64,18 @@ function upsertCierre(data, options) {
   return { previous, current, isNew: !editId, isEdit: Boolean(editId) };
 }
 
-function deleteCierre(id) {
+async function deleteCierre(id) {
   ensureCierresState();
   const existing = state.cierres.find(cierre => cierre.id === id);
   if (!existing) return null;
+
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && typeof isAdminUser === 'function' && !isAdminUser()) {
+    assertCanEditAgentScope(existing.agente);
+    await requestSupabaseRpc('portal_delete_my_cierre', { p_id: id });
+    state.cierres = state.cierres.filter(cierre => cierre.id !== id);
+    return existing;
+  }
+
   state.cierres = state.cierres.filter(cierre => cierre.id !== id);
   saveState();
   return existing;

@@ -18,7 +18,7 @@ function closeSolicitudHook() {
   solicitudHookContext_v41 = null;
 }
 
-function handleSolicitudHookChoice(choice) {
+async function handleSolicitudHookChoice(choice) {
   const context = solicitudHookContext_v41;
   if (!context) {
     closeSolicitudHook();
@@ -26,10 +26,14 @@ function handleSolicitudHookChoice(choice) {
   }
 
   if (choice === 'si') {
-    addSolicitudActivityFromCierre(context);
-    closeSolicitudHook();
-    refreshUI('all');
-    showToast('Solicitud registrada');
+    try {
+      await addSolicitudActivityFromCierre(context);
+      closeSolicitudHook();
+      refreshUI('all');
+      showToast('Solicitud registrada');
+    } catch (error) {
+      showToast(error.message || 'No se pudo registrar la solicitud', 'error');
+    }
     return;
   }
 
@@ -42,7 +46,7 @@ function handleSolicitudHookChoice(choice) {
   showToast('Cierre registrado sin solicitud');
 }
 
-function confirmSolicitudHookFollowup() {
+async function confirmSolicitudHookFollowup() {
   const context = solicitudHookContext_v41;
   if (!context) {
     closeSolicitudHook();
@@ -54,8 +58,12 @@ function confirmSolicitudHookFollowup() {
     return;
   }
 
-  scheduleCierreFollowup(context.id, nextDate);
-  closeSolicitudHook();
-  refreshUI('all');
-  showToast('Seguimiento agendado para ' + formatDate(nextDate));
+  try {
+    await scheduleCierreFollowup(context.id, nextDate);
+    closeSolicitudHook();
+    refreshUI('all');
+    showToast('Seguimiento agendado para ' + formatDate(nextDate));
+  } catch (error) {
+    showToast(error.message || 'No se pudo guardar el seguimiento', 'error');
+  }
 }

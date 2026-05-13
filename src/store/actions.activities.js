@@ -17,14 +17,42 @@ function buildActivityPayload(data) {
     prima: (data.prima || '').trim(),
     productoCotizado: data.type === cierreTypeValue ? (data.productoCotizado || '').trim() : '',
     fumador: normalizeFumadorValue(data.fumador),
+    followupDate_v41: (data.followupDate_v41 || '').trim(),
   };
 }
 
-function upsertActivity(data, options) {
+function syncLocalActivity(activity) {
+  const index = state.activities.findIndex(entry => entry.id === activity.id);
+  if (index >= 0) {
+    state.activities[index] = activity;
+  } else {
+    state.activities.push(activity);
+  }
+}
+
+async function upsertActivity(data, options) {
   const editId = options && options.editId ? options.editId : '';
   const payload = buildActivityPayload(data);
   let previous = null;
   let current = null;
+
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && typeof isAdminUser === 'function' && !isAdminUser()) {
+    assertCanEditAgentScope(payload.agent);
+
+    if (editId) {
+      const existing = state.activities.find(activity => activity.id === editId);
+      if (!existing) throw new Error('No se encontró la actividad a editar');
+      previous = { ...existing };
+      current = { ...existing, ...payload, id: editId };
+    } else {
+      current = { id: uid(), ...payload };
+    }
+
+    const savedActivity = await requestSupabaseRpc('portal_upsert_my_activity', { p_payload: current });
+    current = savedActivity && typeof savedActivity === 'object' ? savedActivity : current;
+    syncLocalActivity(current);
+    return { previous, current, isNew: !editId, isEdit: Boolean(editId) };
+  }
 
   if (editId) {
     const index = state.activities.findIndex(activity => activity.id === editId);
@@ -41,17 +69,24 @@ function upsertActivity(data, options) {
   return { previous, current, isNew: !editId, isEdit: Boolean(editId) };
 }
 
-function deleteActivity(id) {
+async function deleteActivity(id) {
   const existing = state.activities.find(activity => activity.id === id);
   if (!existing) return null;
+
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && typeof isAdminUser === 'function' && !isAdminUser()) {
+    assertCanEditAgentScope(existing.agent);
+    await requestSupabaseRpc('portal_delete_my_activity', { p_id: id });
+    state.activities = state.activities.filter(activity => activity.id !== id);
+    return existing;
+  }
+
   state.activities = state.activities.filter(activity => activity.id !== id);
   saveState();
   return existing;
 }
 
-function addSolicitudActivityFromCierre(activity) {
+async function addSolicitudActivityFromCierre(activity) {
   const newActivity = {
-    id: uid(),
     agent: activity.agent,
     date: new Date().toISOString().slice(0, 10),
     type: getCatalogSemanticValue('activityTypes', 'solicitud'),
@@ -66,38 +101,44 @@ function addSolicitudActivityFromCierre(activity) {
     productoCotizado: '',
     fumador: 'nd',
   };
-  state.activities.push(newActivity);
-  saveState();
-  return newActivity;
+  const result = await upsertActivity(newActivity, {});
+  return result.current;
 }
 
-function scheduleCierreFollowup(activityId, nextDate) {
+async function scheduleCierreFollowup(activityId, nextDate) {
   const activity = state.activities.find(entry => entry.id === activityId);
   if (!activity) return null;
+  const nextActivity = { ...activity };
   const followupNote = '[Seguimiento pendiente · próximo contacto: ' + nextDate + ']';
-  activity.note = (activity.note || '').trim();
-  if (activity.note && !activity.note.includes('[Seguimiento pendiente')) {
-    activity.note = activity.note + '\n' + followupNote;
-  } else if (!activity.note) {
-    activity.note = followupNote;
+  nextActivity.note = (nextActivity.note || '').trim();
+  if (nextActivity.note && !nextActivity.note.includes('[Seguimiento pendiente')) {
+    nextActivity.note = nextActivity.note + '\n' + followupNote;
+  } else if (!nextActivity.note) {
+    nextActivity.note = followupNote;
   }
-  activity.followupDate_v41 = nextDate;
-  saveState();
-  return activity;
+  nextActivity.followupDate_v41 = nextDate;
+  const result = await upsertActivity(nextActivity, { editId: activityId });
+  return result.current;
 }
 
-function unifyProspectActivities(groups) {
+async function unifyProspectActivities(groups) {
   let unifiedCount = 0;
-  (groups || []).forEach(group => {
+  for (const group of (groups || [])) {
     const canonical = (group.canonical || '').trim();
-    if (!canonical) return;
-    (group.activities || []).forEach(activity => {
+    if (!canonical) continue;
+    for (const activity of (group.activities || [])) {
       const stateActivity = state.activities.find(entry => entry.id === activity.id);
-      if (!stateActivity) return;
-      stateActivity.prospect = canonical;
+      if (!stateActivity) continue;
+      if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && typeof isAdminUser === 'function' && !isAdminUser()) {
+        await upsertActivity({ ...stateActivity, prospect: canonical }, { editId: stateActivity.id });
+      } else {
+        stateActivity.prospect = canonical;
+      }
       unifiedCount++;
-    });
-  });
-  saveState();
+    }
+  }
+  if (!(typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && typeof isAdminUser === 'function' && !isAdminUser())) {
+    saveState();
+  }
   return unifiedCount;
 }

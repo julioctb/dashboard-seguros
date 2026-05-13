@@ -22,6 +22,14 @@ function slugify(value) {
 }
 
 function refreshUI(scope) {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    if (typeof applyAppShellSettings === 'function') applyAppShellSettings();
+    renderAgentTabs();
+    renderAgentPanels();
+    if (typeof syncPortalAccessChrome === 'function') syncPortalAccessChrome();
+    return;
+  }
+
   if (typeof applyAppShellSettings === 'function') applyAppShellSettings();
 
   if (scope === 'dashboard') {
@@ -56,6 +64,7 @@ function refreshUI(scope) {
   renderAgentTabs();
   renderAgentPanels();
   if (typeof renderAdmin === 'function') renderAdmin();
+  if (typeof syncPortalAccessChrome === 'function') syncPortalAccessChrome();
 }
 
 function normalizeFumadorValue(value) {

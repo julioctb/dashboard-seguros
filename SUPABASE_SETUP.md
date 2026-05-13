@@ -1,107 +1,130 @@
-# Configurar Supabase como backend principal por snapshot
+# Configurar Supabase con login, roles y acceso por agente
 
-La app sigue funcionando con `localStorage` por defecto, pero ya puede usar Supabase como backend principal para persistir el estado completo en un snapshot JSON.
+El portal ahora usa Supabase Auth cuando el backend activo es `supabase`. En ese modo:
 
-## 1. Crear la tabla
+- `admin` lee y guarda el snapshot completo.
+- `editor` y `viewer` solo cargan su expediente asignado por RPC.
+- Ya no se usa caché local compartida para datos protegidos.
 
-Ejecuta este SQL en Supabase:
+## 1. Ejecutar migraciones
 
-```sql
-create table if not exists public.portal_snapshots (
-  id text primary key,
-  payload jsonb not null,
-  updated_at timestamptz not null default now()
-);
+Aplica las migraciones de `supabase/migrations/`, en especial:
 
-alter table public.portal_snapshots enable row level security;
+- `20260512163000_create_portal_snapshots.sql`
+- `20260512190000_portal_auth_roles.sql`
 
-create policy "portal_snapshots_select"
-  on public.portal_snapshots
-  for select
-  using (true);
+La segunda migración:
 
-create policy "portal_snapshots_insert"
-  on public.portal_snapshots
-  for insert
-  with check (true);
+- crea `public.portal_user_access`,
+- cierra las políticas públicas previas de `portal_snapshots`,
+- deja acceso directo al snapshot solo para `admin`,
+- crea los RPCs:
+  - `portal_get_access_context`
+  - `portal_get_my_workspace`
+  - `portal_upsert_my_activity`
+  - `portal_delete_my_activity`
+  - `portal_upsert_my_cierre`
+  - `portal_delete_my_cierre`
 
-create policy "portal_snapshots_update"
-  on public.portal_snapshots
-  for update
-  using (true)
-  with check (true);
+## 2. Desplegar la Edge Function
+
+Despliega `supabase/functions/portal-admin-users/index.ts`.
+
+La función usa:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Acciones disponibles:
+
+- `list`
+- `invite`
+- `resend_invite`
+- `update_access`
+- `disable_access`
+
+Ejemplo de despliegue con Supabase CLI:
+
+```bash
+supabase functions deploy portal-admin-users
 ```
 
-> Nota: estas políticas permiten leer y escribir con la anon key. Para un entorno público, reemplázalas por políticas autenticadas o por un Edge Function/API propia.
-
-## 2. Configurar el frontend
+## 3. Configurar el frontend
 
 ### Opción A · Configuración persistida en el navegador
-
-Pega esto una vez en la consola del navegador, cambiando URL y anon key:
 
 ```js
 localStorage.setItem('portal_backend_config', JSON.stringify({
   type: 'supabase',
-  cacheLocalSnapshot: true,
+  cacheLocalSnapshot: false,
   seedFromPreload: true,
   supabase: {
     url: 'https://TU_PROJECT_REF.supabase.co',
     anonKey: 'TU_SUPABASE_ANON_KEY',
     table: 'portal_snapshots',
     snapshotId: 'bienestar-patrimonial-paquete-1',
-    fallbackToLocalStorage: true,
+    fallbackToLocalStorage: false,
   },
 }));
 location.reload();
 ```
 
-Para volver al modo local:
-
-```js
-localStorage.removeItem('portal_backend_config');
-location.reload();
-```
-
 ### Opción B · Configuración por archivo
 
-Usa `src/config/backend.supabase.example.js` como referencia y adapta `src/config/backend.js` en tu entorno privado:
+Usa `src/config/backend.supabase.example.js` como base:
 
 ```js
 window.PORTAL_BACKEND_CONFIG = {
   type: 'supabase',
-  cacheLocalSnapshot: true,
+  cacheLocalSnapshot: false,
   seedFromPreload: true,
   supabase: {
     url: 'https://TU_PROJECT_REF.supabase.co',
     anonKey: 'TU_SUPABASE_ANON_KEY',
     table: 'portal_snapshots',
     snapshotId: 'bienestar-patrimonial-paquete-1',
-    fallbackToLocalStorage: true,
+    fallbackToLocalStorage: false,
   },
 };
 ```
 
-## 3. Comportamiento
+## 4. Crear el primer admin
 
-- Al iniciar, la app intenta cargar el snapshot remoto si Supabase está habilitado.
-- Si Supabase no tiene snapshot pero existe estado local, usa el local y lo sube como seed remoto.
-- Si no existe estado local pero sí `PRELOAD_STATE_SNAPSHOT`, usa ese preload como seed remoto inicial.
-- Cada `saveState()` sincroniza Supabase en cola, para que varios guardados rápidos no se pisen entre sí por carreras de red.
-- Si `cacheLocalSnapshot` está activo, también guarda una copia local para arranque rápido y fallback.
-- Si Supabase falla y `fallbackToLocalStorage` está activo, la app continúa funcionando localmente.
+Después de desplegar la migración, crea un usuario en Supabase Auth y asígnale acceso en `public.portal_user_access`.
 
-## 4. Flags útiles
+Ejemplo:
 
-- `cacheLocalSnapshot: true`
-  Mantiene una copia local del snapshot aunque Supabase sea el backend principal. Recomendado.
-- `seedFromPreload: true`
-  Permite usar el preload embebido como semilla inicial cuando no existe snapshot remoto todavía.
-- `fallbackToLocalStorage: true`
-  Si Supabase falla, la app sigue operando con la copia local.
+```sql
+insert into public.portal_user_access (
+  user_id,
+  email,
+  snapshot_id,
+  role,
+  agent_id,
+  is_active
+)
+values (
+  'UUID_DEL_USUARIO_AUTH',
+  'admin@tu-dominio.com',
+  'bienestar-patrimonial-paquete-1',
+  'admin',
+  null,
+  true
+);
+```
 
-## 5. Limitaciones actuales del modelo
+Ese usuario ya podrá entrar al portal y, desde `Control`, invitar al resto.
 
-- El backend actual guarda un snapshot completo, no tablas relacionales separadas.
-- Si dos clientes editan al mismo tiempo, la estrategia sigue siendo `last write wins`.
-- Algunas preferencias estrictamente de UI siguen viviendo en `localStorage`, por ejemplo la vista de bitácora y el estado abierto/cerrado de cards.
+## 5. Flujo operativo esperado
+
+- Sin sesión válida, el portal muestra login y no carga datos.
+- Si el link de invitación llega con `type=invite` o `type=recovery`, el portal obliga a definir contraseña antes de entrar.
+- `admin` usa el snapshot completo.
+- `editor` y `viewer` cargan un workspace filtrado al `agent_id` asignado.
+- Las mutaciones de `editor` viajan por RPC, no por `saveState()` global.
+
+## 6. Notas de seguridad
+
+- La `anon key` sigue siendo pública, pero ya no alcanza para leer o modificar `portal_snapshots` sin sesión válida y rol `admin`.
+- El snapshot local `bienestar_seguimiento_v5_2` se limpia en modo protegido.
+- Las preferencias de UI que sí permanecen en `localStorage` ahora se guardan con clave por usuario.

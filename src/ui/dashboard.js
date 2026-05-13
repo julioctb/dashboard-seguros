@@ -14,7 +14,13 @@ function renderDashboard() {
   const program = getProgramSettings();
   const week = computeCurrentWeek();
   const weekEl = document.getElementById('currentWeekNum');
+  const shellWeekEl = document.getElementById('shellCurrentWeekNum');
+  const citasDenomEl = document.getElementById('kpiCitasDenom');
+  const delDenomEl = document.getElementById('kpiDelDenom');
   if (weekEl) weekEl.textContent = week;
+  if (shellWeekEl) shellWeekEl.textContent = week;
+  if (citasDenomEl) citasDenomEl.textContent = '/' + program.citasContratadas;
+  if (delDenomEl) delDenomEl.textContent = '/' + program.totalEntregables;
 
   const totals = totalsGlobal();
   const citasMeta = Math.max(1, Number(program.citasContratadas) || 0);

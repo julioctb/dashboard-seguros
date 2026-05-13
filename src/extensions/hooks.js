@@ -5,34 +5,32 @@ const BITACORA_VIEW_KEY_V5 = 'bienestar_bitacora_view_v5';
 const PROSPECT_OPEN_KEY_V5 = 'bienestar_prospect_open_v5';
 const DUP_DISMISS_KEY_V5 = 'bienestar_dup_dismiss_v5';
 
-let bitacoraViewMode_v5 = (function() {
-  try {
-    return localStorage.getItem(BITACORA_VIEW_KEY_V5) || 'plain';
-  } catch (error) {
-    return 'plain';
-  }
-})();
+let bitacoraViewMode_v5 = 'plain';
+let openProspectCards_v5 = {};
+let dismissedDuplicates_v5 = {};
 
-let openProspectCards_v5 = (function() {
+function hydrateSessionScopedUiState_v5() {
   try {
-    return JSON.parse(localStorage.getItem(PROSPECT_OPEN_KEY_V5) || '{}');
+    bitacoraViewMode_v5 = localStorage.getItem(getScopedUiStorageKey(BITACORA_VIEW_KEY_V5)) || 'plain';
   } catch (error) {
-    return {};
+    bitacoraViewMode_v5 = 'plain';
   }
-})();
-
-let dismissedDuplicates_v5 = (function() {
   try {
-    return JSON.parse(localStorage.getItem(DUP_DISMISS_KEY_V5) || '{}');
+    openProspectCards_v5 = JSON.parse(localStorage.getItem(getScopedUiStorageKey(PROSPECT_OPEN_KEY_V5)) || '{}');
   } catch (error) {
-    return {};
+    openProspectCards_v5 = {};
   }
-})();
+  try {
+    dismissedDuplicates_v5 = JSON.parse(localStorage.getItem(getScopedUiStorageKey(DUP_DISMISS_KEY_V5)) || '{}');
+  } catch (error) {
+    dismissedDuplicates_v5 = {};
+  }
+}
 
 function setBitacoraViewMode_v5(mode) {
   bitacoraViewMode_v5 = mode;
   try {
-    localStorage.setItem(BITACORA_VIEW_KEY_V5, mode);
+    localStorage.setItem(getScopedUiStorageKey(BITACORA_VIEW_KEY_V5), mode);
   } catch (error) {}
   renderAgentPanels();
 }

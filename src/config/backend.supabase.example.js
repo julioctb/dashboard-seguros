@@ -6,13 +6,13 @@
 
 window.PORTAL_BACKEND_CONFIG = {
   type: 'supabase',
-  cacheLocalSnapshot: true,
+  cacheLocalSnapshot: false,
   seedFromPreload: true,
   supabase: {
     url: 'https://TU_PROJECT_REF.supabase.co',
     anonKey: 'TU_SUPABASE_ANON_KEY',
     table: 'portal_snapshots',
     snapshotId: 'bienestar-patrimonial-paquete-1',
-    fallbackToLocalStorage: true,
+    fallbackToLocalStorage: false,
   },
 };

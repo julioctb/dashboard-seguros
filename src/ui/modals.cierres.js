@@ -15,6 +15,18 @@ function populateCierreCatalogDropdowns(selectedEstado, selectedPrioridad) {
 }
 
 function openCierreModal(prefillAgentId, editId) {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    const targetAgentId = editId
+      ? ((state.cierres || []).find(item => item.id === editId) || {}).agente || prefillAgentId || getAssignedAgentId()
+      : (prefillAgentId || getAssignedAgentId());
+    try {
+      assertCanEditAgentScope(targetAgentId);
+    } catch (error) {
+      showToast(error.message || 'No puedes editar este expediente', 'error');
+      return;
+    }
+  }
+
   cierreEditId_v53 = editId || null;
   const select = document.getElementById('cierreAgente');
   select.innerHTML = state.agents.map(agent => '<option value="' + agent.id + '">' + escapeHtml(agent.name) + '</option>').join('');
@@ -57,7 +69,7 @@ function closeCierreModal() {
   cierreEditId_v53 = null;
 }
 
-function saveCierre() {
+async function saveCierre() {
   const isEdit = Boolean(cierreEditId_v53);
   const data = {
     agente: document.getElementById('cierreAgente').value,
@@ -76,7 +88,7 @@ function saveCierre() {
   }
 
   try {
-    upsertCierre(data, { editId: cierreEditId_v53 });
+    await upsertCierre(data, { editId: cierreEditId_v53 });
     closeCierreModal();
     refreshUI('all');
     showToast(isEdit ? 'Cierre actualizado' : 'Cierre agregado');
@@ -86,17 +98,25 @@ function saveCierre() {
   }
 }
 
-function deleteCierreFromModal() {
+async function deleteCierreFromModal() {
   if (!cierreEditId_v53 || !confirm('¿Eliminar este cierre pendiente?')) return;
-  deleteCierre(cierreEditId_v53);
-  closeCierreModal();
-  refreshUI('all');
-  showToast('Cierre eliminado');
+  try {
+    await deleteCierre(cierreEditId_v53);
+    closeCierreModal();
+    refreshUI('all');
+    showToast('Cierre eliminado');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar el cierre', 'error');
+  }
 }
 
-function confirmDeleteCierre(id) {
+async function confirmDeleteCierre(id) {
   if (!confirm('¿Eliminar este cierre pendiente?')) return;
-  deleteCierre(id);
-  refreshUI('all');
-  showToast('Cierre eliminado');
+  try {
+    await deleteCierre(id);
+    refreshUI('all');
+    showToast('Cierre eliminado');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar el cierre', 'error');
+  }
 }

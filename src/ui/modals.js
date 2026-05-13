@@ -69,6 +69,18 @@ function setAnfNecesidades(values) {
 }
 
 function openActivityModal(prefillAgent, editId, prefill) {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    const targetAgentId = editId
+      ? ((state.activities.find(item => item.id === editId) || {}).agent || prefillAgent || getAssignedAgentId())
+      : ((prefill && prefill.agent) || prefillAgent || getAssignedAgentId());
+    try {
+      assertCanEditAgentScope(targetAgentId);
+    } catch (error) {
+      showToast(error.message || 'No puedes editar este expediente', 'error');
+      return;
+    }
+  }
+
   populateAgentDropdown();
   populateActivityCatalogDropdowns();
   document.getElementById('modalTitle').textContent = editId ? 'Editar actividad' : 'Registrar actividad';
@@ -135,7 +147,7 @@ function readActivityFormData() {
   };
 }
 
-function saveActivity() {
+async function saveActivity() {
   const editId = document.getElementById('actEditId').value;
   const data = readActivityFormData();
   if (!data.date) {
@@ -144,11 +156,11 @@ function saveActivity() {
   }
 
   try {
-    const result = upsertActivity(data, { editId });
+    const result = await upsertActivity(data, { editId });
     closeActivityModal();
     refreshUI('all');
     showToast(editId ? 'Actividad actualizada' : 'Actividad registrada');
-    afterActivitySaved(result);
+    await afterActivitySaved(result);
   } catch (error) {
     console.error('Save activity error', error);
     showToast(error.message || 'No se pudo guardar la actividad', 'error');
@@ -159,26 +171,38 @@ function editActivity(id) {
   openActivityModal(null, id);
 }
 
-function confirmDeleteActivity(id) {
+async function confirmDeleteActivity(id) {
   if (!confirm('¿Eliminar esta actividad? No se puede deshacer.')) return;
-  deleteActivity(id);
-  refreshUI('all');
-  showToast('Actividad eliminada');
+  try {
+    await deleteActivity(id);
+    refreshUI('all');
+    showToast('Actividad eliminada');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar la actividad', 'error');
+  }
 }
 
-function deleteActivityFromModal() {
+async function deleteActivityFromModal() {
   const editId = document.getElementById('actEditId').value;
   if (!editId || !confirm('¿Eliminar esta actividad?')) return;
-  deleteActivity(editId);
-  closeActivityModal();
-  refreshUI('all');
-  showToast('Actividad eliminada');
+  try {
+    await deleteActivity(editId);
+    closeActivityModal();
+    refreshUI('all');
+    showToast('Actividad eliminada');
+  } catch (error) {
+    showToast(error.message || 'No se pudo eliminar la actividad', 'error');
+  }
 }
 
 /* ================================================================
    MODAL AGENTE
 ================================================================ */
 function openNewAgentModal() {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    showToast('Solo el administrador puede crear agentes', 'error');
+    return;
+  }
   populateAgentStatusDropdown();
   document.getElementById('agentModalTitle').textContent = 'Agregar nuevo agente';
   document.getElementById('agentDeleteBtn').style.display = 'none';
@@ -193,6 +217,10 @@ function openNewAgentModal() {
 }
 
 function openEditAgentModal(agentId) {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    showToast('Solo el administrador puede editar agentes', 'error');
+    return;
+  }
   const agent = state.agents.find(item => item.id === agentId);
   if (!agent) return;
   populateAgentStatusDropdown(agent.status);
@@ -214,6 +242,10 @@ function closeAgentModal() {
 }
 
 function saveAgent() {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    showToast('Solo el administrador puede guardar agentes', 'error');
+    return;
+  }
   const editId = document.getElementById('agentEditId').value;
   const data = {
     name: document.getElementById('newAgentName').value.trim(),
@@ -240,6 +272,10 @@ function saveAgent() {
 }
 
 function deleteAgentFromModal() {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    showToast('Solo el administrador puede eliminar agentes', 'error');
+    return;
+  }
   const editId = document.getElementById('agentEditId').value;
   if (!editId) return;
   const agent = state.agents.find(item => item.id === editId);

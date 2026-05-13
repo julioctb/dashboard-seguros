@@ -17,12 +17,17 @@ function getBackendConfig() {
   return normalizeBackendEditableConfig(custom);
 }
 
+function isProtectedPortalSession() {
+  return typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled();
+}
+
 function isSupabaseBackendEnabled() {
   const config = getBackendConfig();
   return config.type === 'supabase' && Boolean(config.supabase.url && config.supabase.anonKey);
 }
 
 function shouldUseLocalSnapshotCache() {
+  if (isProtectedPortalSession()) return false;
   const config = getBackendConfig();
   if (config.type !== 'supabase') return true;
   return config.cacheLocalSnapshot !== false;
@@ -37,20 +42,50 @@ function getSupabaseRestBaseUrl(config) {
   return config.supabase.url.replace(/\/$/, '') + '/rest/v1/' + encodeURIComponent(config.supabase.table);
 }
 
+function getSupabaseFunctionsBaseUrl(config) {
+  return config.supabase.url.replace(/\/$/, '') + '/functions/v1/';
+}
+
+function getEffectiveSnapshotId(config) {
+  if (typeof getActiveSnapshotId === 'function') {
+    const activeSnapshotId = getActiveSnapshotId();
+    if (activeSnapshotId) return activeSnapshotId;
+  }
+  return config.supabase.snapshotId;
+}
+
+async function buildSupabaseHeaders(includeJsonContentType) {
+  const config = getBackendConfig();
+  const headers = {
+    apikey: config.supabase.anonKey,
+    Authorization: 'Bearer ' + config.supabase.anonKey,
+  };
+
+  if (isProtectedPortalSession() && typeof getSupabaseAccessToken === 'function') {
+    const accessToken = await getSupabaseAccessToken();
+    if (accessToken) headers.Authorization = 'Bearer ' + accessToken;
+  }
+
+  if (includeJsonContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  return headers;
+}
+
 async function requestSupabaseSnapshot(method, body) {
   const config = getBackendConfig();
   const url = getSupabaseRestBaseUrl(config);
-  const snapshotId = encodeURIComponent(config.supabase.snapshotId);
+  const snapshotId = encodeURIComponent(getEffectiveSnapshotId(config));
   const query = method === 'GET'
     ? '?id=eq.' + snapshotId + '&select=payload&limit=1'
     : '?on_conflict=id';
+  const headers = await buildSupabaseHeaders(true);
 
   const response = await fetch(url + query, {
     method,
     headers: {
-      apikey: config.supabase.anonKey,
-      Authorization: 'Bearer ' + config.supabase.anonKey,
-      'Content-Type': 'application/json',
+      ...headers,
       Prefer: method === 'POST' ? 'resolution=merge-duplicates,return=minimal' : 'return=representation',
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -75,7 +110,7 @@ async function saveSupabaseSnapshot(snapshot) {
   if (!isSupabaseBackendEnabled()) return;
   const config = getBackendConfig();
   await requestSupabaseSnapshot('POST', {
-    id: config.supabase.snapshotId,
+    id: getEffectiveSnapshotId(config),
     payload: snapshot,
     updated_at: new Date().toISOString(),
   });
@@ -92,6 +127,52 @@ function queueSupabaseSnapshotSave(snapshot) {
     .catch(() => null)
     .then(() => saveSupabaseSnapshot(queuedSnapshot));
   return supabaseSaveQueue;
+}
+
+async function requestSupabaseRpc(name, payload) {
+  if (!isSupabaseBackendEnabled()) {
+    throw new Error('Supabase no está configurado para este portal');
+  }
+  const config = getBackendConfig();
+  const headers = await buildSupabaseHeaders(true);
+  const response = await fetch(config.supabase.url.replace(/\/$/, '') + '/rest/v1/rpc/' + encodeURIComponent(name), {
+    method: 'POST',
+    headers,
+    body: payload ? JSON.stringify(payload) : '{}',
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error('RPC ' + name + ' ' + response.status + ': ' + text);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+async function invokeSupabaseFunction(name, payload) {
+  if (!isSupabaseBackendEnabled()) {
+    throw new Error('Supabase no está configurado para este portal');
+  }
+  const config = getBackendConfig();
+  const headers = await buildSupabaseHeaders(true);
+  const response = await fetch(getSupabaseFunctionsBaseUrl(config) + encodeURIComponent(name), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload || {}),
+  });
+
+  if (!response.ok) {
+    let message = response.status + '';
+    try {
+      const data = await response.json();
+      message = data && data.error ? data.error : message;
+    } catch (error) {}
+    throw new Error(message);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
 }
 
 function updateBackendStatusLabel() {

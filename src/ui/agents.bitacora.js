@@ -47,6 +47,7 @@ function renderAgentBitacora_v5(agentId) {
   const container = document.getElementById('bitacoraContent_' + agentId);
   if (!container) return;
 
+  const canEditActivities = canEditOwnWorkspace();
   let html = '';
   const grouped = groupActivitiesByProspect_v5(agentId);
   const withProspect = grouped.withProspect;
@@ -77,7 +78,7 @@ function renderAgentBitacora_v5(agentId) {
           '<div class="duplicates-banner-title">Posibles prospectos duplicados</div>' +
           '<div class="duplicates-banner-text">Se detectaron ' + activeDups.length + ' grupo' + (activeDups.length === 1 ? '' : 's') + ' con nombres parecidos escritos de forma distinta.</div>' +
           '<div class="duplicates-banner-actions">' +
-            '<button class="duplicates-btn" onclick="openDupUnifyModal_v5(\'' + agentId + '\')">Revisar y unificar</button>' +
+            (canEditActivities ? '<button class="duplicates-btn" onclick="openDupUnifyModal_v5(\'' + agentId + '\')">Revisar y unificar</button>' : '') +
             '<button class="duplicates-btn dismiss" onclick="dismissAllDuplicates_v5(\'' + agentId + '\')">Ignorar por ahora</button>' +
           '</div>' +
         '</div>' +
@@ -98,9 +99,10 @@ function renderAgentBitacoraGrouped_v5(agentId) {
   const grouped = groupActivitiesByProspect_v5(agentId);
   const withProspect = grouped.withProspect;
   const withoutProspect = grouped.withoutProspect;
+  const canEditActivities = canEditOwnWorkspace();
 
   if (withProspect.length === 0 && withoutProspect.length === 0) {
-    return '<div class="prospect-card-empty" style="background:white; border:1px solid var(--gray-200); border-radius:var(--radius)">Sin actividad. Usa "+ Nueva actividad" para empezar.</div>';
+    return '<div class="prospect-card-empty" style="background:white; border:1px solid var(--gray-200); border-radius:var(--radius)">' + (canEditActivities ? 'Sin actividad. Usa "+ Nueva actividad" para empezar.' : 'Sin actividad registrada aún.') + '</div>';
   }
 
   let html = '';
@@ -199,6 +201,7 @@ function renderProspectCardMetadata_v5(g) {
 }
 
 function renderProspectActivity_v5(act) {
+  const canEditActivities = canEditOwnWorkspace();
   return '<div class="prospect-card-activity">' +
       '<div class="prospect-card-activity-date">' + formatDate(act.date) + '</div>' +
     '<div class="prospect-card-activity-main">' +
@@ -209,15 +212,18 @@ function renderProspectActivity_v5(act) {
       '</div>' +
       (act.note ? '<div class="prospect-card-activity-note">' + escapeHtml(act.note) + '</div>' : '') +
     '</div>' +
-    '<div class="prospect-card-activity-actions">' +
-      '<button class="icon-btn" onclick="event.stopPropagation(); editActivity(\'' + act.id + '\')" title="Editar">✎</button>' +
-      '<button class="icon-btn danger" onclick="event.stopPropagation(); confirmDeleteActivity(\'' + act.id + '\')" title="Eliminar">×</button>' +
-    '</div>' +
+    (canEditActivities
+      ? '<div class="prospect-card-activity-actions">' +
+          '<button class="icon-btn" onclick="event.stopPropagation(); editActivity(\'' + act.id + '\')" title="Editar">✎</button>' +
+          '<button class="icon-btn danger" onclick="event.stopPropagation(); confirmDeleteActivity(\'' + act.id + '\')" title="Eliminar">×</button>' +
+        '</div>'
+      : '') +
   '</div>';
 }
 
 function renderAgentBitacoraPlain_v5(agentId) {
   const acts = state.activities.filter(a => a.agent === agentId).sort((x, y) => (y.date || '').localeCompare(x.date || ''));
+  const canEditActivities = canEditOwnWorkspace();
   if (acts.length === 0) {
     return '<div class="prospect-card-empty" style="background:white; border:1px solid var(--gray-200); border-radius:var(--radius)">Sin actividad.</div>';
   }
@@ -235,10 +241,12 @@ function renderAgentBitacoraPlain_v5(agentId) {
         '<strong style="font-size:13px;color:var(--navy)">' + escapeHtml(act.prospect || '(sin nombre)') + '</strong>' +
         (act.fumador === 'no' ? '<span class="fumador-pill no">🚭 No fuma</span>' : '') +
         (act.fumador === 'si' ? '<span class="fumador-pill si">🚬 Fuma</span>' : '') +
-        '<div style="margin-left:auto;display:flex;gap:4px">' +
-          '<button class="icon-btn" onclick="editActivity(\'' + act.id + '\')" title="Editar">✎</button>' +
-          '<button class="icon-btn danger" onclick="confirmDeleteActivity(\'' + act.id + '\')" title="Eliminar">×</button>' +
-        '</div>' +
+        (canEditActivities
+          ? '<div style="margin-left:auto;display:flex;gap:4px">' +
+              '<button class="icon-btn" onclick="editActivity(\'' + act.id + '\')" title="Editar">✎</button>' +
+              '<button class="icon-btn danger" onclick="confirmDeleteActivity(\'' + act.id + '\')" title="Eliminar">×</button>' +
+            '</div>'
+          : '') +
       '</div>' +
       (hasANF ?
         '<div style="background:var(--teal-faint);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--navy);display:flex;flex-wrap:wrap;gap:12px;margin-bottom:' + (act.note ? '6px' : '0') + '">' +
@@ -255,20 +263,24 @@ function renderAgentBitacoraPlain_v5(agentId) {
 function toggleProspectCard_v5(agentId, prospectKey) {
   const cardKey = agentId + '::' + prospectKey;
   openProspectCards_v5[cardKey] = !openProspectCards_v5[cardKey];
-  try { localStorage.setItem(PROSPECT_OPEN_KEY_V5, JSON.stringify(openProspectCards_v5)); } catch (error) {}
+  try { localStorage.setItem(getScopedUiStorageKey(PROSPECT_OPEN_KEY_V5), JSON.stringify(openProspectCards_v5)); } catch (error) {}
   renderAgentBitacora_v5(agentId);
 }
 
 function dismissAllDuplicates_v5(agentId) {
   const dups = detectProspectDuplicates_v5(agentId);
   dismissedDuplicates_v5[agentId] = dups.map(g => g.key);
-  try { localStorage.setItem(DUP_DISMISS_KEY_V5, JSON.stringify(dismissedDuplicates_v5)); } catch (error) {}
+  try { localStorage.setItem(getScopedUiStorageKey(DUP_DISMISS_KEY_V5), JSON.stringify(dismissedDuplicates_v5)); } catch (error) {}
   renderAgentBitacora_v5(agentId);
 }
 
 let dupUnifyContext_v5 = null;
 
 function openDupUnifyModal_v5(agentId) {
+  if (!canEditOwnWorkspace()) {
+    showToast('Tu acceso es solo de lectura', 'error');
+    return;
+  }
   const dups = detectProspectDuplicates_v5(agentId);
   if (dups.length === 0) {
     showToast('No hay duplicados detectados');

@@ -3,11 +3,12 @@
 ================================================================ */
 function renderAgentTabs() {
   const container = document.getElementById('agentTabs');
+  const showAddAgent = !(typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser());
   container.innerHTML = state.agents.map(a =>
     '<button class="agent-tab ' + (a.id === state.currentAgent ? 'active' : '') + '" data-agent="' + a.id + '">' +
     '<span class="status-dot ' + getCatalogSemanticKeyForValue('agentStatuses', a.status) + '"></span>' + escapeHtml(a.name) + '</button>'
   ).join('') +
-  '<button class="agent-add-btn" onclick="openNewAgentModal()"><span>+</span> Agregar agente</button>';
+  (showAddAgent ? '<button class="agent-add-btn" onclick="openNewAgentModal()"><span>+</span> Agregar agente</button>' : '');
 
   container.querySelectorAll('.agent-tab').forEach(btn => {
     btn.onclick = () => {
@@ -19,16 +20,18 @@ function renderAgentTabs() {
 
 function renderAgentHeaderSection(agent) {
   const statusTone = getCatalogSemanticKeyForValue('agentStatuses', agent.status);
+  const canEditAgent = !(typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser());
   return '<div class="agent-header-card">' +
     '<div class="agent-header-avatar">' + agent.initials + '</div>' +
     '<div class="agent-header-main">' +
+      '<div class="stamp-label">Expediente de agente</div>' +
       '<div class="agent-header-name">' + escapeHtml(agent.name) +
         '<span class="status-pill ' + statusTone + '" style="font-size:10px">' + escapeHtml(agent.tag) + '</span>' +
       '</div>' +
-      '<div class="agent-header-meta">ID: ' + agent.id + ' · Iniciales: ' + agent.initials + '</div>' +
+      '<div class="agent-header-meta">Folio: ' + agent.id + ' · Iniciales: ' + agent.initials + '</div>' +
     '</div>' +
     '<div class="agent-header-actions">' +
-      '<button class="edit-agent-btn" onclick="openEditAgentModal(\'' + agent.id + '\')"><span>✎</span> Editar agente</button>' +
+      (canEditAgent ? '<button class="edit-agent-btn" onclick="openEditAgentModal(\'' + agent.id + '\')"><span>✎</span> Editar agente</button>' : '') +
     '</div>' +
   '</div>';
 }
@@ -40,7 +43,7 @@ function renderAgentCycleSection(agent, stats, semaforo) {
   const stageCls = (count, isLast) => count > 0 ? (isLast ? 'active' : 'touched') : '';
   return '<div class="ciclo-meter">' +
     '<div class="ciclo-meter-top">' +
-      '<div class="ciclo-meter-title">Ciclo de la cita · 4 etapas</div>' +
+      '<div class="ciclo-meter-title">Carril del expediente comercial · 4 etapas</div>' +
       '<span class="ciclo-meter-verdict ' + semaforo.level + '">' + semaforo.text + '</span>' +
     '</div>' +
     '<div class="ciclo-stages">' +
@@ -59,19 +62,20 @@ function renderAgentCycleSection(agent, stats, semaforo) {
 }
 
 function renderAgentSubtabs(agentId, activityCount) {
-  return '<div class="subtabs">' +
-    '<button class="subtab ' + (state.currentSubtab === 'bitacora' ? 'active' : '') + '" data-sub="bitacora">Bitácora de citas <span class="subtab-pill">' + activityCount + '</span></button>' +
-    '<button class="subtab ' + (state.currentSubtab === 'cierres' ? 'active' : '') + '" data-sub="cierres">Cierres pendientes <span class="subtab-pill" id="cierresPillAgent_' + agentId + '">0</span></button>' +
-    '<button class="subtab ' + (state.currentSubtab === 'ficha' ? 'active' : '') + '" data-sub="ficha">Ficha de avance</button>' +
+  return '<div class="subtabs document-tabs">' +
+    '<button class="subtab ' + (state.currentSubtab === 'bitacora' ? 'active' : '') + '" data-sub="bitacora">Bitácora <span class="subtab-pill">' + activityCount + '</span></button>' +
+    '<button class="subtab ' + (state.currentSubtab === 'cierres' ? 'active' : '') + '" data-sub="cierres">Cierres de expediente <span class="subtab-pill" id="cierresPillAgent_' + agentId + '">0</span></button>' +
+    '<button class="subtab ' + (state.currentSubtab === 'ficha' ? 'active' : '') + '" data-sub="ficha">Ficha operativa</button>' +
   '</div>';
 }
 
 function renderAgentBitacoraPanel(agent, activityCount) {
+  const canEditActivities = canEditOwnWorkspace();
   return '<div class="subpanel ' + (state.currentSubtab === 'bitacora' ? 'active' : '') + '" id="sub-bitacora">' +
     '<div class="activity-card">' +
       '<div class="activity-header">' +
         '<h3>Registro de citas · ' + activityCount + ' actividades</h3>' +
-        '<button class="add-btn-sm" onclick="openActivityModal(\'' + agent.id + '\')">+ Nueva actividad</button>' +
+        (canEditActivities ? '<button class="add-btn-sm" onclick="openActivityModal(\'' + agent.id + '\')">+ Nueva actividad</button>' : '') +
       '</div>' +
       '<div class="bitacora-toolbar">' +
         '<div class="bitacora-view-toggle">' +
@@ -86,11 +90,12 @@ function renderAgentBitacoraPanel(agent, activityCount) {
 }
 
 function renderAgentCierresPanel(agent) {
+  const canEditCierres = canEditOwnWorkspace();
   return '<div class="subpanel ' + (state.currentSubtab === 'cierres' ? 'active' : '') + '" id="sub-cierres">' +
     '<div class="activity-card">' +
       '<div class="activity-header">' +
         '<h3>Cierres pendientes · ' + escapeHtml(agent.name) + '</h3>' +
-        '<button class="add-btn-sm" onclick="openCierreModal(\'' + agent.id + '\')">+ Agregar cierre</button>' +
+        (canEditCierres ? '<button class="add-btn-sm" onclick="openCierreModal(\'' + agent.id + '\')">+ Agregar cierre</button>' : '') +
       '</div>' +
       '<div id="cierresAgentContent_' + agent.id + '" class="cierres-agent-list" style="margin-top:12px"></div>' +
     '</div>' +

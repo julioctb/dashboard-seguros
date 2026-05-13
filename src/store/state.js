@@ -15,17 +15,21 @@ let state = {
   settings: buildDefaultSettings(),
   currentAgent: null,
   currentSubtab: 'bitacora',
+  scopeMode: 'full',
 };
 
 function normalizeStateSnapshot(snapshot) {
   const defaults = buildDefaultState();
   const raw = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  const scopeMode = raw.scopeMode === 'agent' ? 'agent' : 'full';
   const rawSettings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
   const legacyProgram = raw.program && typeof raw.program === 'object' ? raw.program : {};
   const agents = Array.isArray(raw.agents) && raw.agents.length > 0 ? raw.agents : defaults.agents;
-  const deliverables = (raw.deliverables && typeof raw.deliverables === 'object')
+  const deliverables = scopeMode === 'agent'
+    ? ((raw.deliverables && typeof raw.deliverables === 'object') ? raw.deliverables : {})
+    : ((raw.deliverables && typeof raw.deliverables === 'object')
     ? { ...defaults.deliverables, ...raw.deliverables }
-    : defaults.deliverables;
+    : defaults.deliverables);
   const settings = normalizeSettings({
     ...rawSettings,
     program: {
@@ -65,6 +69,7 @@ function normalizeStateSnapshot(snapshot) {
     settings,
     currentAgent: raw.currentAgent || defaults.currentAgent,
     currentSubtab: raw.currentSubtab || defaults.currentSubtab,
+    scopeMode,
   };
 }
 
@@ -88,6 +93,7 @@ function createStateSnapshot() {
     settings: state.settings,
     currentAgent: state.currentAgent,
     currentSubtab: state.currentSubtab,
+    scopeMode: state.scopeMode || 'full',
   };
 }
 
@@ -117,8 +123,24 @@ function saveLocalStateSnapshot(snapshot) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
 }
 
+function clearLocalStateSnapshot() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {}
+}
+
+async function loadScopedWorkspaceSnapshot() {
+  return requestSupabaseRpc('portal_get_my_workspace');
+}
+
 async function loadState() {
   const backendConfig = getBackendConfig();
+  const protectedSession = typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled();
+
+  if (protectedSession) {
+    clearLocalStateSnapshot();
+  }
+
   const localSnapshot = (() => {
     try {
       return loadLocalStateSnapshot();
@@ -130,6 +152,14 @@ async function loadState() {
 
   if (isSupabaseBackendEnabled()) {
     try {
+      if (protectedSession && typeof isAdminUser === 'function' && !isAdminUser()) {
+        const scopedSnapshot = await loadScopedWorkspaceSnapshot();
+        applyStateSnapshot(scopedSnapshot);
+        state.currentAgent = (typeof getAssignedAgentId === 'function' && getAssignedAgentId()) || state.currentAgent;
+        setBackendStatus({ type: 'supabase', connected: true, lastError: null, lastSyncAt: new Date().toISOString() });
+        return;
+      }
+
       const remoteSnapshot = await loadSupabaseSnapshot();
       if (remoteSnapshot) {
         applyStateSnapshot(remoteSnapshot);
@@ -145,6 +175,11 @@ async function loadState() {
     } catch (error) {
       console.error('Supabase load error', error);
       setBackendStatus({ type: 'supabase', connected: false, lastError: error.message });
+      if (protectedSession) {
+        applyStateSnapshot(buildDefaultState());
+        showToast('No se pudo cargar el portal protegido', 'error');
+        return;
+      }
       if (!backendConfig.supabase.fallbackToLocalStorage) {
         applyStateSnapshot(buildDefaultState());
         showToast('No se pudo cargar Supabase', 'error');
@@ -168,6 +203,10 @@ async function loadState() {
 }
 
 function saveState() {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && typeof isAdminUser === 'function' && !isAdminUser()) {
+    throw new Error('Esta acción no está permitida para tu rol');
+  }
+
   const snapshot = createStateSnapshot();
   try {
     saveLocalStateSnapshot(snapshot);
@@ -182,7 +221,7 @@ function saveState() {
       .catch(error => {
         console.error('Supabase save error', error);
         setBackendStatus({ type: 'supabase', connected: false, lastError: error.message });
-        if (!getBackendConfig().supabase.fallbackToLocalStorage) {
+        if (!getBackendConfig().supabase.fallbackToLocalStorage || (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled())) {
           showToast('No se pudo guardar en Supabase', 'error');
         }
       });

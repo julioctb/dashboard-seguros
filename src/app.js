@@ -18,16 +18,22 @@ function runOnReadyTasks() {
 }
 
 function goToAgent(agentId) {
+  if (typeof hasAgentScope === 'function' && !hasAgentScope(agentId)) return;
   state.currentAgent = agentId;
   state.currentSubtab = 'bitacora';
   switchView('agents');
 }
 
 function switchView(viewName) {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    viewName = 'agents';
+  }
+
   document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
   document.getElementById('view-' + viewName).classList.add('active');
-  document.querySelector('[data-view="' + viewName + '"]').classList.add('active');
+  const activeTab = document.querySelector('[data-view="' + viewName + '"]');
+  if (activeTab) activeTab.classList.add('active');
 
   if (viewName === 'agents') {
     refreshUI('agents');
@@ -43,6 +49,11 @@ function switchView(viewName) {
 }
 
 function exportData() {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    showToast('Solo el administrador puede exportar respaldos', 'error');
+    return;
+  }
+
   const data = {
     exportDate: new Date().toISOString(),
     program: getProgramSettings(),
@@ -59,6 +70,12 @@ function exportData() {
 }
 
 function handleImportFile(event) {
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    showToast('Solo el administrador puede importar respaldos', 'error');
+    event.target.value = '';
+    return;
+  }
+
   const file = event.target.files[0];
   if (!file) return;
   if (!confirm('¿Reemplazar TODOS los datos actuales con los del respaldo? Esta acción no se puede deshacer.')) {
@@ -94,9 +111,18 @@ function handleImportFile(event) {
    INIT
 ================================================================ */
 async function init() {
+  if (typeof hydrateSessionScopedUiState_v5 === 'function') {
+    hydrateSessionScopedUiState_v5();
+  }
+
   await loadState();
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    state.currentAgent = getAssignedAgentId() || state.currentAgent;
+    state.currentSubtab = 'bitacora';
+  }
   updateBackendStatusLabel();
   if (typeof applyAppShellSettings === 'function') applyAppShellSettings();
+  if (typeof syncPortalAccessChrome === 'function') syncPortalAccessChrome();
 
   document.querySelectorAll('.tab').forEach(button => {
     button.addEventListener('click', () => switchView(button.dataset.view));
@@ -149,9 +175,19 @@ async function init() {
   });
 
   refreshUI('all');
+  if (typeof isPortalAuthEnabled === 'function' && isPortalAuthEnabled() && !isAdminUser()) {
+    switchView('agents');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  if (typeof bootstrapPortalAuth === 'function') {
+    const authBootstrap = await bootstrapPortalAuth();
+    if (!authBootstrap.ok) {
+      runOnReadyTasks();
+      return;
+    }
+  }
   await init();
   runOnReadyTasks();
 });

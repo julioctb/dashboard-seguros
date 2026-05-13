@@ -57,6 +57,7 @@ function renderCierresAgent_v53(agentId) {
   const container = document.getElementById('cierresAgentContent_' + agentId);
   if (!container) return;
   const items = (state.cierres || []).filter(c => c.agente === agentId);
+  const canEditCierres = canEditOwnWorkspace();
   /* Actualizar pill del subtab */
   const pill = document.getElementById('cierresPillAgent_' + agentId);
   if (pill) pill.textContent = items.filter(c => getCatalogSemanticKeyForValue('cierreStatuses', c.estado) !== 'listo').length;
@@ -87,10 +88,12 @@ function renderCierresAgent_v53(agentId) {
         '</div>' +
         (c.nota ? '<div class="cierres-agent-note">' + escapeHtml(c.nota) + '</div>' : '') +
       '</div>' +
-      '<div class="cierres-agent-actions">' +
-        '<button class="icon-btn" onclick="openCierreModal(\'' + agentId + '\', \'' + c.id + '\')">✎</button>' +
-        '<button class="icon-btn danger" onclick="confirmDeleteCierre(\'' + c.id + '\')">×</button>' +
-      '</div>' +
+      (canEditCierres
+        ? '<div class="cierres-agent-actions">' +
+            '<button class="icon-btn" onclick="openCierreModal(\'' + agentId + '\', \'' + c.id + '\')">✎</button>' +
+            '<button class="icon-btn danger" onclick="confirmDeleteCierre(\'' + c.id + '\')">×</button>' +
+          '</div>'
+        : '') +
     '</div>'
   ).join('');
 }
